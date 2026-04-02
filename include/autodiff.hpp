@@ -291,9 +291,13 @@ public:
      */
     explicit AutoDiff(const DataType& data);
 
+    template<std::integral IntType>
+    AutoDiff(IntType value);
+
     /**
      * @brief Constructs a constant (all derivatives zero).
      * @param value The constant value.
+     * @note Keep this constructor explicit to avoid accidental conversions that might lead to unintended differentiation or compilation issues.
      */
     explicit AutoDiff(T value);
 
@@ -1151,6 +1155,85 @@ struct PowExpr : BaseOperand<PowExpr>{
 
 };
 
+
+struct SqrtExpr : BaseOperand<SqrtExpr>{
+
+    /// @brief Forward operation: sqrt(f).
+    template<typename T>
+    INLINE static T operation(const T& f){
+        return sqrt(f);
+    }
+
+    /// @brief Differentiation rule: d(sqrt(f))/dx = df/(2·sqrt(f)).
+    template<typename T>
+    INLINE static T diff_rule(const T& f, const T& df){
+        return df/(2*sqrt(f));
+    }
+};
+
+
+struct AbsExpr : BaseOperand<AbsExpr>{
+
+    /// @brief Forward operation: abs(f).
+    template<typename T>
+    INLINE static T operation(const T& f){
+        return abs(f);
+    }
+
+    /// @brief Differentiation rule: d(abs(f))/dx = df/dx·sign(f) (undefined at f=0).
+    template<typename T>
+    INLINE static T diff_rule(const T& f, const T& df){
+        return df*(f>0 ? 1 : (f<0 ? -1 : 0));
+    }
+};
+
+
+struct SinExpr : BaseOperand<SinExpr>{
+
+    /// @brief Forward operation: sin(f).
+    template<typename T>
+    INLINE static T operation(const T& f){
+        return sin(f);
+    }
+
+    /// @brief Differentiation rule: d(sin(f))/dx = cos(f)·df/dx.
+    template<typename T>
+    INLINE static T diff_rule(const T& f, const T& df){
+        return cos(f)*df;
+    }
+};
+
+struct CosExpr : BaseOperand<CosExpr>{
+
+    /// @brief Forward operation: cos(f).
+    template<typename T>
+    INLINE static T operation(const T& f){
+        return cos(f);
+    }
+
+    /// @brief Differentiation rule: d(cos(f))/dx = -sin(f)·df/dx.
+    template<typename T>
+    INLINE static T diff_rule(const T& f, const T& df){
+        return -sin(f)*df;
+    }
+};
+
+
+struct TanExpr : BaseOperand<TanExpr>{
+
+    /// @brief Forward operation: tan(f).
+    template<typename T>
+    INLINE static T operation(const T& f){
+        return tan(f);
+    }
+
+    /// @brief Differentiation rule: d(tan(f))/dx = sec²(f)·df/dx.
+    template<typename T>
+    INLINE static T diff_rule(const T& f, const T& df){
+        return (1+tan(f)*tan(f))*df;
+    }
+};
+
 // ============================================================================
 //                         IMPLEMENTATION DETAILS
 // ============================================================================
@@ -1172,6 +1255,10 @@ AUTODIFF::AutoDiff(T value, Variable<I> x) {
 
 template<typename T, Int Norder, Int Nvars>
 AUTODIFF::AutoDiff(const DataType& data) : _data(data){}
+
+template<typename T, Int Norder, Int Nvars>
+template<std::integral IntType>
+AUTODIFF::AutoDiff(IntType value) {_data[0] = T(value);}
 
 template<typename T, Int Norder, Int Nvars>
 AUTODIFF::AutoDiff(T value) {_data[0] = value;}
@@ -1375,6 +1462,111 @@ COMPOUND_OPERATOR(operator*=, MulExpr)
 OPERATOR(operator/, DivExpr)
 COMPOUND_OPERATOR(operator/=, DivExpr)
 
+
+// ============================================================================
+//                         COMPARISON OPERATORS
+// ============================================================================
+
+
+/// @brief Equality comparison: compares values only (derivatives ignored).
+template<typename T, Int Norder, Int Nvars>
+inline bool operator==(const AUTODIFF& a, const AUTODIFF& b){
+    return a.value() == b.value();
+}
+
+/// @brief Inequality comparison: compares values only (derivatives ignored).
+template<typename T, Int Norder, Int Nvars>
+inline bool operator!=(const AUTODIFF& a, const AUTODIFF& b){
+    return a.value() != b.value();
+}
+
+/// @brief Less-than comparison: compares values only (derivatives ignored).
+template<typename T, Int Norder, Int Nvars>
+inline bool operator<(const AUTODIFF& a, const AUTODIFF& b){
+    return a.value() < b.value();
+}
+
+/// @brief Greater-than comparison: compares values only (derivatives ignored).
+template<typename T, Int Norder, Int Nvars>
+inline bool operator>(const AUTODIFF& a, const AUTODIFF& b){
+    return a.value() > b.value();
+}
+
+/// @brief Less-than-or-equal comparison: compares values only (derivatives ignored).
+template<typename T, Int Norder, Int Nvars>
+inline bool operator<=(const AUTODIFF& a, const AUTODIFF& b){
+    return a.value() <= b.value();
+}
+
+/// @brief Greater-than-or-equal comparison: compares values only (derivatives ignored).
+template<typename T, Int Norder, Int Nvars>
+inline bool operator>=(const AUTODIFF& a, const AUTODIFF& b){
+    return a.value() >= b.value();
+}
+
+
+// ----------------- templated comparison overloads ----------------------
+template<typename T, Int Norder, Int Nvars, typename U>
+inline bool operator==(const AUTODIFF& a, const U& b){
+    return a.value() == b;
+}
+
+template<typename T, Int Norder, Int Nvars, typename U>
+inline bool operator!=(const AUTODIFF& a, const U& b){
+    return a.value() != b;
+}
+
+template<typename T, Int Norder, Int Nvars, typename U>
+inline bool operator<(const AUTODIFF& a, const U& b){
+    return a.value() < b;
+}
+
+template<typename T, Int Norder, Int Nvars, typename U>
+inline bool operator>(const AUTODIFF& a, const U& b){
+    return a.value() > b;
+}
+
+template<typename T, Int Norder, Int Nvars, typename U>
+inline bool operator<=(const AUTODIFF& a, const U& b){
+    return a.value() <= b;
+}
+
+template<typename T, Int Norder, Int Nvars, typename U>
+inline bool operator>=(const AUTODIFF& a, const U& b){
+    return a.value() >= b;
+}
+
+// Allow comparisons with scalar on the left-hand side
+template<typename T, Int Norder, Int Nvars, typename U>
+inline bool operator==(const U& a, const AUTODIFF& b){
+    return a == b.value();
+}
+
+template<typename T, Int Norder, Int Nvars, typename U>
+inline bool operator!=(const U& a, const AUTODIFF& b){
+    return a != b.value();
+}
+
+template<typename T, Int Norder, Int Nvars, typename U>
+inline bool operator<(const U& a, const AUTODIFF& b){
+    return a < b.value();
+}
+
+template<typename T, Int Norder, Int Nvars, typename U>
+inline bool operator>(const U& a, const AUTODIFF& b){
+    return a > b.value();
+}
+
+template<typename T, Int Norder, Int Nvars, typename U>
+inline bool operator<=(const U& a, const AUTODIFF& b){
+    return a <= b.value();
+}
+
+template<typename T, Int Norder, Int Nvars, typename U>
+inline bool operator>=(const U& a, const AUTODIFF& b){
+    return a >= b.value();
+}
+
 // ============================================================================
 //                         MATHEMATICAL FUNCTIONS
 // ============================================================================
@@ -1388,6 +1580,83 @@ MATHFUNC(log, LogExpr)
 /// @brief Exponential function: exp(f) with automatic differentiation.
 MATHFUNC(exp, ExpExpr)
 
+/// @brief Square root: sqrt(f) with automatic differentiation.
+MATHFUNC(sqrt, SqrtExpr)
+
+/// @brief Sine function: sin(f) with automatic differentiation.
+MATHFUNC(sin, SinExpr)
+
+/// @brief Cosine function: cos(f) with automatic differentiation.
+MATHFUNC(cos, CosExpr)
+
+/// @brief Tangent function: tan(f) with automatic differentiation.
+MATHFUNC(tan, TanExpr)
+
+/// @brief Absolute value function: abs(f) with automatic differentiation.
+MATHFUNC(abs, AbsExpr)
+
+
+// ============================================================================
+//                              STREAM OPERATOR
+// ============================================================================
+
+/// @brief Stream output for AutoDiff variables (prints value only).
+template<typename T, Int Norder, Int Nvars>
+inline std::ostream& operator<<(std::ostream& os, const AUTODIFF& x){
+    os << x.value();
+    return os;
+}
+
+
 } // namespace autodiff
+
+namespace std {
+template<typename T, autodiff::Int Norder, autodiff::Int Nvars>
+class numeric_limits<autodiff::AUTODIFF> : public numeric_limits<T>{
+public:
+
+    static constexpr autodiff::AUTODIFF min() noexcept {
+        return autodiff::AUTODIFF(numeric_limits<T>::min());
+    }
+
+    static constexpr autodiff::AUTODIFF max() noexcept {
+        return autodiff::AUTODIFF(numeric_limits<T>::max());
+    }
+
+    static constexpr autodiff::AUTODIFF lowest() noexcept {
+        return autodiff::AUTODIFF(numeric_limits<T>::lowest());
+    }
+
+    static constexpr autodiff::AUTODIFF epsilon() noexcept {
+        return autodiff::AUTODIFF(numeric_limits<T>::epsilon());
+    }
+
+    static constexpr autodiff::AUTODIFF infinity() noexcept {
+        return autodiff::AUTODIFF(numeric_limits<T>::infinity());
+    }
+
+    static constexpr autodiff::AUTODIFF quiet_NaN() noexcept {
+        return autodiff::AUTODIFF(numeric_limits<T>::quiet_NaN());
+    }
+
+    static constexpr autodiff::AUTODIFF signaling_NaN() noexcept {
+        return autodiff::AUTODIFF(numeric_limits<T>::signaling_NaN());
+    }
+    
+    static constexpr autodiff::AUTODIFF denorm_min() noexcept {
+        return autodiff::AUTODIFF(numeric_limits<T>::denorm_min());
+    }
+};
+
+template<typename T, autodiff::Int Norder, autodiff::Int Nvars>
+inline bool isfinite(const autodiff::AUTODIFF& x){
+    return std::isfinite(x.value());
+}
+
+template<typename T, autodiff::Int Norder, autodiff::Int Nvars>
+inline autodiff::AUTODIFF abs(const autodiff::AUTODIFF& x){
+    return autodiff::abs(x);
+}
+}
 
 #endif // AUTODIFF_HPP
