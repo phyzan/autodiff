@@ -7,7 +7,9 @@
 #include <cstring>
 #include <numeric>
 
-#define THIS static_cast<copy_const_t<std::remove_reference_t<decltype(*this)>, Derived>*>(this)
+#define THIS static_cast<std::conditional_t<std::is_void_v<Derived>, \
+    std::remove_reference_t<decltype(*this)>, \
+    copy_const_t<std::remove_reference_t<decltype(*this)>, Derived>>*>(this)
 #define UNIQUE_NAME(base) CONCAT(base, __COUNTER__)
 #define CONCAT(a,b) CONCAT_IMPL(a,b)
 #define CONCAT_IMPL(a,b) a##b
@@ -31,6 +33,7 @@
 
 #define INLINE __attribute__((always_inline)) inline
 #define LAMBDA_INLINE __attribute__((always_inline, flatten))
+
 
 namespace autodiff {
 
@@ -267,5 +270,6 @@ inline constexpr size_t multiset_coef(size_t n, size_t k){
 }
 
 } // namespace autodiff
+
 
 #endif
