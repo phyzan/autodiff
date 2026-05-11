@@ -20,10 +20,10 @@
 #include <cmath>
 #include "iterators.hpp"
 
-#ifndef FAST
-#define MAYBE_INLINE inline
+#ifndef AUTODIFF_FAST
+#define AUTODIFF_MAYBE_INLINE inline
 #else
-#define MAYBE_INLINE INLINE
+#define AUTODIFF_MAYBE_INLINE INLINE
 #endif
 
 #define AUTODIFF AutoDiff<T, Norder, Nvars>
@@ -335,7 +335,7 @@ public:
      */
     template<VarLike... IntType>
     requires (sizeof...(IntType)<=Norder)
-    MAYBE_INLINE Reduced<sizeof...(IntType)> constexpr reduced_diff(IntType... x)const;
+    AUTODIFF_MAYBE_INLINE Reduced<sizeof...(IntType)> constexpr reduced_diff(IntType... x)const;
 
     /**
      * @brief Compile-time optimized version of reduced_diff.
@@ -348,7 +348,7 @@ public:
      */
     template<Int... I>
     requires (sizeof...(I)<=Norder)
-    MAYBE_INLINE Reduced<sizeof...(I)> constexpr cmpl_reduced_diff(Variable<I>... x)const;
+    AUTODIFF_MAYBE_INLINE Reduced<sizeof...(I)> constexpr cmpl_reduced_diff(Variable<I>... x)const;
 
     /// @brief Returns a const pointer to the internal storage.
     inline const T* data() const;
@@ -409,7 +409,7 @@ private:
      */
     template<VarLike... IntType>
     requires (sizeof...(IntType)<=Norder)
-    MAYBE_INLINE static constexpr ReducedArray<sizeof...(IntType)> offsets_for_reduced_diff(IntType... x);
+    AUTODIFF_MAYBE_INLINE static constexpr ReducedArray<sizeof...(IntType)> offsets_for_reduced_diff(IntType... x);
 
     DataType _data{};  ///< Storage for value and all derivatives.
 
@@ -497,7 +497,7 @@ struct BaseOperand{
      * computes all partial derivatives via Derived::diff_rule.
      */
     template<typename T, Int Norder, Int Nvars, typename... U>
-    MAYBE_INLINE static auto opt_result_aux(ExprStruct<T, Norder, Nvars>, const U&... f){
+    AUTODIFF_MAYBE_INLINE static auto opt_result_aux(ExprStruct<T, Norder, Nvars>, const U&... f){
         T v = Derived::operation(_value<T, AUTODIFF>(f)...);
         if constexpr (Norder==0) {
             return AUTODIFF(v);
@@ -618,7 +618,7 @@ struct AddExpr : BaseOperand<AddExpr>{
         return f;
     }
 
-#ifdef SCALAR_OPTS
+#ifdef AUTODIFF_SCALAR_OPTS
     /// @brief Optimized element-wise addition (AutoDiff + AutoDiff).
     template<typename T, Int Norder, Int Nvars>
     INLINE static AUTODIFF opt_result(const AUTODIFF& f, const AUTODIFF& g){
@@ -697,7 +697,7 @@ struct SubtrExpr : BaseOperand<SubtrExpr>{
         return f;
     }
 
-#ifdef SCALAR_OPTS
+#ifdef AUTODIFF_SCALAR_OPTS
     /// @brief Optimized element-wise subtraction (AutoDiff - AutoDiff).
     template<typename T, Int Norder, Int Nvars>
     INLINE static AUTODIFF opt_result(const AUTODIFF& f, const AUTODIFF& g){
@@ -886,7 +886,7 @@ struct MulExpr : BaseOperand<MulExpr>{
         return f;
     }
 
-#ifdef SCALAR_OPTS
+#ifdef AUTODIFF_SCALAR_OPTS
     /// @brief Optimized AutoDiff * scalar.
     template<typename U, typename T, Int Norder, Int Nvars>
     requires (std::convertible_to<U, T>)
@@ -910,7 +910,7 @@ struct MulExpr : BaseOperand<MulExpr>{
     }
 #endif
 
-#ifdef ITER_MUL_OPT
+#ifdef AUTODIFF_ITER_MUL_OPT
     /**
      * @brief Optimized multiplication using precomputed Leibniz coefficients.
      *
@@ -936,7 +936,7 @@ struct MulExpr : BaseOperand<MulExpr>{
         return res;
     }
 
-#elif defined (ITER_MUL)
+#elif defined (AUTODIFF_ITER_MUL)
     /// @brief Iterative multiplication without precomputed cache.
     template<typename T, Int Norder, Int Nvars>
     INLINE static AUTODIFF opt_result(const AUTODIFF& f, const AUTODIFF& g){
@@ -1040,7 +1040,7 @@ struct DivExpr : BaseOperand<DivExpr>{
         return f;
     }
 
-#ifdef SCALAR_OPTS
+#ifdef AUTODIFF_SCALAR_OPTS
     /// @brief Optimized AutoDiff / scalar.
     template<typename U, typename T, Int Norder, Int Nvars>
     requires (std::convertible_to<U, T>)
@@ -1345,7 +1345,7 @@ INLINE constexpr Int MultiDiff<Norder, Nvars>::offset(const std::array<Int, Nvar
 template<typename T, Int Norder, Int Nvars>
 template<VarLike... IntType>
 requires (sizeof...(IntType)<=Norder)
-MAYBE_INLINE constexpr AUTODIFF::ReducedArray<sizeof...(IntType)> AUTODIFF::offsets_for_reduced_diff(IntType... x) {
+AUTODIFF_MAYBE_INLINE constexpr AUTODIFF::ReducedArray<sizeof...(IntType)> AUTODIFF::offsets_for_reduced_diff(IntType... x) {
     constexpr Int NewOrder = Norder-static_cast<Int>(sizeof...(x));
 
     std::array<Int, AutoDiff<T, NewOrder, Nvars>::Ntot> res{};
@@ -1388,7 +1388,7 @@ INLINE typename AUTODIFF::ReducedType AUTODIFF::reduced() const{
 template<typename T, Int Norder, Int Nvars>
 template<VarLike... IntType>
 requires (sizeof...(IntType)<=Norder)
-MAYBE_INLINE AUTODIFF::Reduced<sizeof...(IntType)> constexpr AUTODIFF::reduced_diff(IntType... I)const{
+AUTODIFF_MAYBE_INLINE AUTODIFF::Reduced<sizeof...(IntType)> constexpr AUTODIFF::reduced_diff(IntType... I)const{
     using ResType = typename AUTODIFF::Reduced<sizeof...(I)>;
     using IterType = MultiSetIterator<Nvars, Norder, true>;
     auto offsets = offsets_for_reduced_diff(I...);
@@ -1403,7 +1403,7 @@ MAYBE_INLINE AUTODIFF::Reduced<sizeof...(IntType)> constexpr AUTODIFF::reduced_d
 template<typename T, Int Norder, Int Nvars>
 template<Int... I>
 requires (sizeof...(I)<=Norder)
-MAYBE_INLINE AUTODIFF::Reduced<sizeof...(I)> constexpr AUTODIFF::cmpl_reduced_diff(Variable<I>...)const{
+AUTODIFF_MAYBE_INLINE AUTODIFF::Reduced<sizeof...(I)> constexpr AUTODIFF::cmpl_reduced_diff(Variable<I>...)const{
     using ResType = typename AUTODIFF::Reduced<sizeof...(I)>;
     using IterType = MultiSetIterator<Nvars, Norder, true>;
     auto constexpr offsets = offsets_for_reduced_diff(I...);

@@ -256,10 +256,10 @@ AutoDiff provides several preprocessor macros to optimize performance for differ
 
 | Macro | Description | Trade-off |
 |-------|-------------|-----------|
-| `FAST` | Enables aggressive inlining with `INLINE` attribute | Faster execution, longer compilation time |
-| `SCALAR_OPTS` | Enables optimized scalar-AutoDiff operations | Faster scalar ops, more code |
-| `ITER_MUL_OPT` | Uses precomputed Leibniz coefficients for multiplication | Fastest multiplication, compile-time cost |
-| `ITER_MUL` | Uses iterative (non-recursive) multiplication | Balanced speed/compile-time |
+| `AUTODIFF_FAST` | Enables aggressive inlining with `INLINE` attribute | Faster execution, longer compilation time |
+| `AUTODIFF_SCALAR_OPTS` | Enables optimized scalar-AutoDiff operations | Faster scalar ops, more code |
+| `AUTODIFF_ITER_MUL_OPT` | Uses precomputed Leibniz coefficients for multiplication | Fastest multiplication, compile-time cost |
+| `AUTODIFF_ITER_MUL` | Uses iterative (non-recursive) multiplication | Balanced speed/compile-time |
 
 ### Usage
 
@@ -268,43 +268,43 @@ AutoDiff provides several preprocessor macros to optimize performance for differ
 g++ -std=c++20 -O3 main.cpp -o main
 
 # With all optimizations
-g++ -std=c++20 -O3 -DFAST -DSCALAR_OPTS -DITER_MUL_OPT main.cpp -o main
+g++ -std=c++20 -O3 -DAUTODIFF_FAST -DAUTODIFF_SCALAR_OPTS -DAUTODIFF_ITER_MUL_OPT main.cpp -o main
 
 # Balanced (recommended for most cases)
-g++ -std=c++20 -O3 -DFAST -DSCALAR_OPTS main.cpp -o main
+g++ -std=c++20 -O3 -DAUTODIFF_FAST -DAUTODIFF_SCALAR_OPTS main.cpp -o main
 
 # With iterative multiplication (good compile times)
-g++ -std=c++20 -O3 -DFAST -DITER_MUL main.cpp -o main
+g++ -std=c++20 -O3 -DAUTODIFF_FAST -DAUTODIFF_ITER_MUL main.cpp -o main
 ```
 
 ### Macro Details
 
-#### `FAST`
+#### `AUTODIFF_FAST`
 
-When defined, `MAYBE_INLINE` becomes `INLINE` (force inline). Otherwise, it's just `inline`.
+When defined, `AUTODIFF_MAYBE_INLINE` becomes `INLINE` (force inline). Otherwise, it's just `inline`.
 
 ```cpp
-// Without FAST: MAYBE_INLINE = inline
-// With FAST:    MAYBE_INLINE = __attribute__((always_inline)) inline
+// Without AUTODIFF_FAST: AUTODIFF_MAYBE_INLINE = inline
+// With AUTODIFF_FAST:    AUTODIFF_MAYBE_INLINE = __attribute__((always_inline)) inline
 ```
 
-#### `SCALAR_OPTS`
+#### `AUTODIFF_SCALAR_OPTS`
 
 Enables specialized overloads for operations between AutoDiff and scalars:
 
 ```cpp
 using namespace autodiff;
 
-// Without SCALAR_OPTS: scalar * AutoDiff goes through generic code path
-// With SCALAR_OPTS: optimized element-wise multiplication
+// Without AUTODIFF_SCALAR_OPTS: scalar * AutoDiff goes through generic code path
+// With AUTODIFF_SCALAR_OPTS: optimized element-wise multiplication
 AutoDiff<double, 2, 2> f = a * 2.0;  // Each derivative multiplied by 2
 ```
 
-#### `ITER_MUL_OPT`
+#### `AUTODIFF_ITER_MUL_OPT`
 
 Uses `LeibnizDiff` to precompute all multinomial coefficients and array offsets at compile time. Best performance but increases compile time for high orders.
 
-#### `ITER_MUL`
+#### `AUTODIFF_ITER_MUL`
 
 Uses an iterative implementation without precomputed caches. Good balance between runtime performance and compile time.
 
@@ -313,10 +313,10 @@ Uses an iterative implementation without precomputed caches. Good balance betwee
 | Use Case | Flags |
 |----------|-------|
 | **Development/Debugging** | `-O2` |
-| **Production (balanced)** | `-O3 -DFAST -DSCALAR_OPTS` |
-| **Maximum Performance** | `-O3 -DFAST -DSCALAR_OPTS -DITER_MUL_OPT` |
-| **Fast Compile Times** | `-O3 -DSCALAR_OPTS` |
-| **High-Order Derivatives** | `-O3 -DFAST -DITER_MUL` |
+| **Production (balanced)** | `-O3 -DAUTODIFF_FAST -DAUTODIFF_SCALAR_OPTS` |
+| **Maximum Performance** | `-O3 -DAUTODIFF_FAST -DAUTODIFF_SCALAR_OPTS -DAUTODIFF_ITER_MUL_OPT` |
+| **Fast Compile Times** | `-O3 -DAUTODIFF_SCALAR_OPTS` |
+| **High-Order Derivatives** | `-O3 -DAUTODIFF_FAST -DAUTODIFF_ITER_MUL` |
 
 ---
 

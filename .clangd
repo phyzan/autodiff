@@ -14,6 +14,7 @@ CompileFlags:
     - "-Wno-sign-compare"
     - "-Wno-c2y-extensions"
     - "-fno-math-errno"
+    - "-ferror-limit=0"
   Compiler: clang++
 
 Index:
