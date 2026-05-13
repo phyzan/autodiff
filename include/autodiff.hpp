@@ -23,7 +23,7 @@
 #ifndef AUTODIFF_FAST
 #define AUTODIFF_MAYBE_INLINE AUTODIFF_HOST_DEVICE inline
 #else
-#define AUTODIFF_MAYBE_INLINE INLINE
+#define AUTODIFF_MAYBE_INLINE AD_INLINE
 #endif
 
 #define AUTODIFF AutoDiff<T, Norder, Nvars>
@@ -34,16 +34,16 @@
  */
 #define OPERATOR(NAME, OPERAND) \
 template<typename T, Int Norder, Int Nvars> \
-INLINE auto NAME(const AUTODIFF& a, const AUTODIFF& b){\
+AD_INLINE auto NAME(const AUTODIFF& a, const AUTODIFF& b){\
     return OPERAND::opt_result(a, b);\
 }\
 template<typename B, typename T, Int Norder, Int Nvars> \
-INLINE auto NAME(const AUTODIFF& a, const B& b){\
+AD_INLINE auto NAME(const AUTODIFF& a, const B& b){\
     return OPERAND::opt_result(a, b);\
 }\
 \
 template<typename A, typename T, Int Norder, Int Nvars> \
-INLINE auto NAME(const A& a, const AUTODIFF& b){\
+AD_INLINE auto NAME(const A& a, const AUTODIFF& b){\
     return OPERAND::opt_result(a, b);\
 }
 
@@ -52,11 +52,11 @@ INLINE auto NAME(const A& a, const AUTODIFF& b){\
  */
 #define COMPOUND_OPERATOR(NAME, OPERAND) \
 template<typename T, Int Norder, Int Nvars> \
-INLINE auto NAME(AUTODIFF& a, const AUTODIFF& b){\
+AD_INLINE auto NAME(AUTODIFF& a, const AUTODIFF& b){\
     return OPERAND::compound_assign(a, b);\
 }\
 template<typename B, typename T, Int Norder, Int Nvars> \
-INLINE auto NAME(AUTODIFF& a, const B& b){\
+AD_INLINE auto NAME(AUTODIFF& a, const B& b){\
     return OPERAND::compound_assign(a, b);\
 }
 
@@ -65,7 +65,7 @@ INLINE auto NAME(AUTODIFF& a, const B& b){\
  */
 #define MATHFUNC(NAME, OPERAND)\
 template<typename T, Int Norder, Int Nvars> \
-INLINE AUTODIFF NAME(const AUTODIFF& x){ \
+AD_INLINE AUTODIFF NAME(const AUTODIFF& x){ \
     return OPERAND::opt_result(x); \
 }
 
@@ -139,7 +139,7 @@ concept VarLike = ((is_variable_v<Ts> || std::is_integral_v<Ts>) && ...);
  */
 template<VarLike A, VarLike... T>
 constexpr Int var_count(A x, T... y){
-    return EXPAND(Int, sizeof...(y), I,
+    return AD_EXPAND(Int, sizeof...(y), I,
         return ((Int(x)==Int(y))+...+0UL);
     );
 }
@@ -169,7 +169,7 @@ struct MultiDiff{
      * @param order The derivative order.
      * @return C(Nvars + order - 1, order), the multiset coefficient.
      */
-    INLINE static constexpr Int Ndiffs(Int order);
+    AD_INLINE static constexpr Int Ndiffs(Int order);
 
     /**
      * @brief Computes the local offset within a group of same-order derivatives.
@@ -177,14 +177,14 @@ struct MultiDiff{
      * @return Index within the group of derivatives of that total order.
      */
     template<std::integral... IntType>
-    INLINE static constexpr Int local_offset(IntType... order);
+    AD_INLINE static constexpr Int local_offset(IntType... order);
 
     /**
      * @brief Computes the starting index for derivatives of a given total order.
      * @param order The total derivative order.
      * @return Index where derivatives of this order begin in storage.
      */
-    INLINE static constexpr Int global_offset(Int order);
+    AD_INLINE static constexpr Int global_offset(Int order);
 
     /**
      * @brief Computes the absolute index of a specific partial derivative.
@@ -192,10 +192,10 @@ struct MultiDiff{
      * @return Index into the flat derivative array.
      */
     template<std::integral... IntType>
-    INLINE static constexpr Int offset(IntType... order);
+    AD_INLINE static constexpr Int offset(IntType... order);
 
     /// @brief Overload accepting derivative counts as an array.
-    INLINE static constexpr Int offset(const std::array<Int, Nvars>& diff_count);
+    AD_INLINE static constexpr Int offset(const std::array<Int, Nvars>& diff_count);
 
     /**
      * @brief Converts variable indices to per-variable derivative counts.
@@ -204,7 +204,7 @@ struct MultiDiff{
      */
     template<VarLike... Var>
     static constexpr std::array<Int, Nvars> diff_count(Var... x){
-        return EXPAND(Int, Nvars, I,
+        return AD_EXPAND(Int, Nvars, I,
             return std::array<Int, Nvars>{var_count(I, x...)...};
         );
     }
@@ -305,7 +305,7 @@ public:
      * @brief Returns the function value.
      * @return The value component (zeroth-order derivative).
      */
-    INLINE const T& value() const;
+    AD_INLINE const T& value() const;
 
     /**
      * @brief Creates a copy with reduced derivative order.
@@ -315,7 +315,7 @@ public:
      *
      * @return AutoDiff with maximum order reduced by 1.
      */
-    INLINE ReducedType reduced() const;
+    AD_INLINE ReducedType reduced() const;
 
     /**
      * @brief Extracts a partial derivative as a new AutoDiff.
@@ -351,10 +351,10 @@ public:
     AUTODIFF_MAYBE_INLINE Reduced<sizeof...(I)> constexpr cmpl_reduced_diff(Variable<I>... x)const;
 
     /// @brief Returns a const pointer to the internal storage.
-    INLINE const T* data() const;
+    AD_INLINE const T* data() const;
 
     /// @brief Returns a mutable pointer to the internal storage.
-    INLINE T* data();
+    AD_INLINE T* data();
 
     /**
      * @brief Extracts a derivative, returning the same AutoDiff type.
@@ -367,7 +367,7 @@ public:
      * @return AutoDiff of same type with derivative as value.
      */
     template<VarLike... IntType>
-    INLINE AUTODIFF diff(IntType... x) const;
+    AD_INLINE AUTODIFF diff(IntType... x) const;
 
     /**
      * @brief Returns the numeric value of a specific partial derivative.
@@ -376,7 +376,7 @@ public:
      * @return The derivative value as a scalar.
      */
     template<VarLike... IntType>
-    INLINE T diff_value(IntType... x) const;
+    AD_INLINE T diff_value(IntType... x) const;
 
     /// @brief Unary plus (returns copy).
     AUTODIFF operator+()const{
@@ -399,7 +399,7 @@ private:
      * @param order_wrt Derivative count for each variable.
      */
     template<std::integral... IntType>
-    INLINE T value_of_diff_counts(IntType... order_wrt)const{
+    AD_INLINE T value_of_diff_counts(IntType... order_wrt)const{
         return _data[Base::offset(order_wrt...)];
     }
 
@@ -484,7 +484,7 @@ struct BaseOperand{
      * @return AutoDiff containing result value and all derivatives.
      */
     template<typename... U>
-    INLINE static auto opt_result(const U&... f){
+    AD_INLINE static auto opt_result(const U&... f){
         using ExprType = extract_expr<U...>::type;
         static_assert(!std::is_same_v<ExprType, void>, "No AutoDiff found in arguments");
         return opt_result_aux(typename ExprType::DataStruct(), masked_value<typename ExprType::ValueType>(f)...);
@@ -504,13 +504,13 @@ struct BaseOperand{
         }
         else{
             // Compute derivative w.r.t. each variable
-            auto q = [&] AUTODIFF_DEVICE <Int I> (auto&&... f) LAMBDA_INLINE {
+            auto q = [&] AUTODIFF_DEVICE <Int I> (auto&&... f) AD_LAMBDA_INLINE {
                 return Derived::diff_rule(
                     _reduced_value<T, AUTODIFF>(f)...,
                     _reduced_diff<T, AUTODIFF, I>(f)...
                 );
             };
-            auto h = EXPAND(Int, Nvars, I,
+            auto h = AD_EXPAND(Int, Nvars, I,
                 return std::array<typename AUTODIFF::ReducedType, Nvars>{q.template operator()<I>(f...)...};
             );
 
@@ -518,10 +518,10 @@ struct BaseOperand{
             Int n=1;
 
             // Assemble derivatives into result array
-            EXPAND(Int, Norder, Ord,
-                auto g = [&] AUTODIFF_DEVICE <Int ord>() LAMBDA_INLINE {
-                    EXPAND(Int, Nvars, Ivar,
-                        auto f = [&] AUTODIFF_DEVICE <Int var>() LAMBDA_INLINE {
+            AD_EXPAND(Int, Norder, Ord,
+                auto g = [&] AUTODIFF_DEVICE <Int ord>() AD_LAMBDA_INLINE {
+                    AD_EXPAND(Int, Nvars, Ivar,
+                        auto f = [&] AUTODIFF_DEVICE <Int var>() AD_LAMBDA_INLINE {
                             constexpr Int Noff_tot = MultiDiff<AUTODIFF::ReducedOrder, Nvars>::offset(ord*(var==Ivar)...);
                             constexpr Int Nelements = MultiDiff<AUTODIFF::ReducedOrder, Nvars>::Ndiffs(ord)-MultiDiff<AUTODIFF::ReducedOrder, Nvars>::local_offset(ord*(var==Ivar)...);
                             utils::copy_array(res.data()+n, h[var].data()+Noff_tot, Nelements);
@@ -541,19 +541,19 @@ private:
 
     /// @brief Identity for AutoDiff arguments.
     template<typename T, Int Norder, Int Nvars>
-    INLINE static decltype(auto) masked_value(const AUTODIFF& item){
+    AD_INLINE static decltype(auto) masked_value(const AUTODIFF& item){
         return item;
     }
 
     /// @brief Converts scalars to the appropriate numeric type.
     template<typename T, typename U>
-    INLINE static decltype(auto) masked_value(U&& item){
+    AD_INLINE static decltype(auto) masked_value(U&& item){
         return T(item);
     }
 
     /// @brief Extracts the scalar value from an argument.
     template<typename T, typename ExprType, typename ArgType>
-    INLINE static T _value(const ArgType& f) {
+    AD_INLINE static T _value(const ArgType& f) {
         static_assert(std::is_same_v<ArgType, ExprType>||std::is_convertible_v<ArgType, T>, "Invalid argument");
         if constexpr (std::is_same_v<ArgType, ExprType>) {
             return f.value();
@@ -565,7 +565,7 @@ private:
 
     /// @brief Gets the reduced-order representation of an argument.
     template<typename T, typename ExprType, typename ArgType>
-    INLINE static auto _reduced_value(const ArgType& f){
+    AD_INLINE static auto _reduced_value(const ArgType& f){
         static_assert(std::is_same_v<ArgType, ExprType>||std::is_convertible_v<ArgType, T>, "Invalid argument");
         if constexpr (std::is_same_v<ArgType, ExprType>) {
             return f.reduced();
@@ -577,7 +577,7 @@ private:
 
     /// @brief Gets the derivative w.r.t. variable I (zero for scalars).
     template<typename T, typename ExprType, Int I, typename ArgType>
-    INLINE static auto _reduced_diff(const ArgType& f){
+    AD_INLINE static auto _reduced_diff(const ArgType& f){
         static_assert(std::is_same_v<ArgType, ExprType>||std::is_convertible_v<ArgType, T>, "Invalid argument");
         if constexpr (std::is_same_v<ArgType, ExprType>) {
             return f.cmpl_reduced_diff(Variable<I>());
@@ -598,13 +598,13 @@ struct AddExpr : BaseOperand<AddExpr>{
 
     /// @brief Forward operation: f + g.
     template<typename T>
-    INLINE static T operation(const T& f, const T& g){
+    AD_INLINE static T operation(const T& f, const T& g){
         return f+g;
     }
 
     /// @brief Compound assignment: f += g (AutoDiff += AutoDiff).
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF& compound_assign(AUTODIFF& f, const AUTODIFF& other){
+    AD_INLINE static AUTODIFF& compound_assign(AUTODIFF& f, const AUTODIFF& other){
         for (Int i=0; i<AUTODIFF::Ntot; i++){
             f.data()[i] += other.data()[i];
         }
@@ -613,7 +613,7 @@ struct AddExpr : BaseOperand<AddExpr>{
 
     /// @brief Compound assignment: f += scalar.
     template<typename U, typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF& compound_assign(AUTODIFF& f, const U& other){
+    AD_INLINE static AUTODIFF& compound_assign(AUTODIFF& f, const U& other){
         f.data()[0] += other;
         return f;
     }
@@ -621,7 +621,7 @@ struct AddExpr : BaseOperand<AddExpr>{
 #ifdef AUTODIFF_SCALAR_OPTS
     /// @brief Optimized element-wise addition (AutoDiff + AutoDiff).
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF opt_result(const AUTODIFF& f, const AUTODIFF& g){
+    AD_INLINE static AUTODIFF opt_result(const AUTODIFF& f, const AUTODIFF& g){
         AUTODIFF res;
         for (Int i=0; i<AUTODIFF::Ntot; i++){
             res.data()[i] = f.data()[i]+g.data()[i];
@@ -631,7 +631,7 @@ struct AddExpr : BaseOperand<AddExpr>{
 
     /// @brief Optimized scalar + AutoDiff.
     template<typename U, typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF opt_result(const U& f, const AUTODIFF& g){
+    AD_INLINE static AUTODIFF opt_result(const U& f, const AUTODIFF& g){
         AUTODIFF res = g;
         res.data()[0] += f;
         return res;
@@ -639,7 +639,7 @@ struct AddExpr : BaseOperand<AddExpr>{
 
     /// @brief Optimized AutoDiff + scalar.
     template<typename U, typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF opt_result(const AUTODIFF& f, const U& g){
+    AD_INLINE static AUTODIFF opt_result(const AUTODIFF& f, const U& g){
         AUTODIFF res = f;
         res.data()[0] += g;
         return res;
@@ -648,20 +648,20 @@ struct AddExpr : BaseOperand<AddExpr>{
 
     /// @brief Differentiation rule: d(f+g)/dx = df/dx + dg/dx.
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const AUTODIFF& g, const AUTODIFF& df, const AUTODIFF& dg){
+    AD_INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const AUTODIFF& g, const AUTODIFF& df, const AUTODIFF& dg){
         return df+dg;
     }
 
     /// @brief Differentiation rule when g is constant.
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const T& g, const AUTODIFF& df, const T& dg){
+    AD_INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const T& g, const AUTODIFF& df, const T& dg){
         assert(dg==0);
         return df;
     }
 
     /// @brief Differentiation rule when f is constant.
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF diff_rule(const T& f, const AUTODIFF& g, const T& df, const AUTODIFF& dg){
+    AD_INLINE static AUTODIFF diff_rule(const T& f, const AUTODIFF& g, const T& df, const AUTODIFF& dg){
         assert(df==0);
         return dg;
     }
@@ -677,13 +677,13 @@ struct SubtrExpr : BaseOperand<SubtrExpr>{
 
     /// @brief Forward operation: f - g.
     template<typename T>
-    INLINE static T operation(const T& f, const T& g){
+    AD_INLINE static T operation(const T& f, const T& g){
         return f-g;
     }
 
     /// @brief Compound assignment: f -= g (AutoDiff -= AutoDiff).
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF& compound_assign(AUTODIFF& f, const AUTODIFF& other){
+    AD_INLINE static AUTODIFF& compound_assign(AUTODIFF& f, const AUTODIFF& other){
         for (Int i=0; i<AUTODIFF::Ntot; i++){
             f.data()[i] -= other.data()[i];
         }
@@ -692,7 +692,7 @@ struct SubtrExpr : BaseOperand<SubtrExpr>{
 
     /// @brief Compound assignment: f -= scalar.
     template<typename U, typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF& compound_assign(AUTODIFF& f, const U& other){
+    AD_INLINE static AUTODIFF& compound_assign(AUTODIFF& f, const U& other){
         f.data()[0] -= other;
         return f;
     }
@@ -700,7 +700,7 @@ struct SubtrExpr : BaseOperand<SubtrExpr>{
 #ifdef AUTODIFF_SCALAR_OPTS
     /// @brief Optimized element-wise subtraction (AutoDiff - AutoDiff).
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF opt_result(const AUTODIFF& f, const AUTODIFF& g){
+    AD_INLINE static AUTODIFF opt_result(const AUTODIFF& f, const AUTODIFF& g){
         AUTODIFF res;
         for (Int i=0; i<AUTODIFF::Ntot; i++){
             res.data()[i] = f.data()[i]-g.data()[i];
@@ -710,7 +710,7 @@ struct SubtrExpr : BaseOperand<SubtrExpr>{
 
     /// @brief Optimized scalar - AutoDiff.
     template<typename U, typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF opt_result(const U& f, const AUTODIFF& g){
+    AD_INLINE static AUTODIFF opt_result(const U& f, const AUTODIFF& g){
         AUTODIFF res(f-g.value());
         for (Int i=1; i<AUTODIFF::Ntot; i++){
             res.data()[i] = -g.data()[i];
@@ -720,7 +720,7 @@ struct SubtrExpr : BaseOperand<SubtrExpr>{
 
     /// @brief Optimized AutoDiff - scalar.
     template<typename U, typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF opt_result(const AUTODIFF& f, const U& g){
+    AD_INLINE static AUTODIFF opt_result(const AUTODIFF& f, const U& g){
         AUTODIFF res = f;
         res.data()[0] -= g;
         return res;
@@ -729,20 +729,20 @@ struct SubtrExpr : BaseOperand<SubtrExpr>{
 
     /// @brief Differentiation rule: d(f-g)/dx = df/dx - dg/dx.
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const AUTODIFF& g, const AUTODIFF& df, const AUTODIFF& dg){
+    AD_INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const AUTODIFF& g, const AUTODIFF& df, const AUTODIFF& dg){
         return df-dg;
     }
 
     /// @brief Differentiation rule when g is constant.
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const T& g, const AUTODIFF& df, const T& dg){
+    AD_INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const T& g, const AUTODIFF& df, const T& dg){
         assert(dg==0);
         return df;
     }
 
     /// @brief Differentiation rule when f is constant.
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF diff_rule(const T& f, const AUTODIFF& g, const T& df, const AUTODIFF& dg){
+    AD_INLINE static AUTODIFF diff_rule(const T& f, const AUTODIFF& g, const T& df, const AUTODIFF& dg){
         assert(df==0);
         return -dg;
     }
@@ -774,11 +774,11 @@ struct LeibnizDiff{
      */
     template<typename Callable1, typename Callable2>
     static constexpr void iterate(Callable1&& f_main, Callable2&& f_dummy){
-        FOR_LOOP(Int, Iord, Norder+1,
+        AD_FOR_LOOP(Int, Iord, Norder+1,
             using IterType = utils::MultiSetIterator<Iord, Nvars, true>;
-            EXPAND(Int, Nvars, Ivar,
-                auto main_func = [&] AUTODIFF_DEVICE (auto&, auto& ord_of_var) LAMBDA_INLINE {
-                    auto dummy_func = [&] AUTODIFF_DEVICE (auto... dummy_order) LAMBDA_INLINE {
+            AD_EXPAND(Int, Nvars, Ivar,
+                auto main_func = [&] AUTODIFF_DEVICE (auto&, auto& ord_of_var) AD_LAMBDA_INLINE {
+                    auto dummy_func = [&] AUTODIFF_DEVICE (auto... dummy_order) AD_LAMBDA_INLINE {
                         f_dummy(Iord, ord_of_var, std::array<Int, Nvars>({dummy_order...}));
                     };
                     utils::DynamicNDIterator<Nvars>((ord_of_var[Ivar]+1)...).iterate(dummy_func);
@@ -792,10 +792,10 @@ struct LeibnizDiff{
     /// @brief Total number of terms across all Leibniz sums.
     static constexpr Int total_cache_count(){
         Int res = 0;
-        auto f_dummy = [&] AUTODIFF_DEVICE (Int order, auto order_wrt, auto dummy_order_wrt) LAMBDA_INLINE {
+        auto f_dummy = [&] AUTODIFF_DEVICE (Int order, auto order_wrt, auto dummy_order_wrt) AD_LAMBDA_INLINE {
             res++;
         };
-        iterate([] AUTODIFF_DEVICE (auto, auto) LAMBDA_INLINE {}, f_dummy);
+        iterate([] AUTODIFF_DEVICE (auto, auto) AD_LAMBDA_INLINE {}, f_dummy);
         return res;
     }
 
@@ -803,10 +803,10 @@ struct LeibnizDiff{
     static constexpr std::array<Int, NDIFFS> Nsum_per_offset(){
         std::array<Int, NDIFFS> res{};
         Int i=0;
-        auto f_main = [&] AUTODIFF_DEVICE (Int, auto) LAMBDA_INLINE {
+        auto f_main = [&] AUTODIFF_DEVICE (Int, auto) AD_LAMBDA_INLINE {
             i++;
         };
-        auto f_dummy = [&] AUTODIFF_DEVICE (Int, auto, auto) LAMBDA_INLINE {
+        auto f_dummy = [&] AUTODIFF_DEVICE (Int, auto, auto) AD_LAMBDA_INLINE {
             res[i]++;
         };
         iterate(f_main, f_dummy);
@@ -817,12 +817,12 @@ struct LeibnizDiff{
     static constexpr auto cached_coefs(){
         std::array<Int, total_cache_count()> res{};
         Int i=0;
-        auto f_dummy = [&] AUTODIFF_DEVICE (Int, auto order_wrt, auto dummy_order_wrt) LAMBDA_INLINE {
-            EXPAND(Int, Nvars, Ivar,
+        auto f_dummy = [&] AUTODIFF_DEVICE (Int, auto order_wrt, auto dummy_order_wrt) AD_LAMBDA_INLINE {
+            AD_EXPAND(Int, Nvars, Ivar,
                 res[i++] = (utils::comb(order_wrt[Ivar], dummy_order_wrt[Ivar])*...);
             );
         };
-        iterate([] AUTODIFF_DEVICE (auto, auto) LAMBDA_INLINE {}, f_dummy);
+        iterate([] AUTODIFF_DEVICE (auto, auto) AD_LAMBDA_INLINE {}, f_dummy);
         return res;
     }
 
@@ -830,12 +830,12 @@ struct LeibnizDiff{
     static constexpr auto cached_left_offsets(){
         std::array<Int, total_cache_count()> res{};
         Int i=0;
-        auto f_dummy = [&] AUTODIFF_DEVICE (Int, auto, auto dummy_order_wrt) LAMBDA_INLINE {
-            EXPAND(Int, Nvars, Ivar,
+        auto f_dummy = [&] AUTODIFF_DEVICE (Int, auto, auto dummy_order_wrt) AD_LAMBDA_INLINE {
+            AD_EXPAND(Int, Nvars, Ivar,
                 res[i++] = MultiDiff<Norder, Nvars>::offset(dummy_order_wrt[Ivar]...);
             );
         };
-        iterate([] AUTODIFF_DEVICE (auto, auto) LAMBDA_INLINE {}, f_dummy);
+        iterate([] AUTODIFF_DEVICE (auto, auto) AD_LAMBDA_INLINE {}, f_dummy);
         return res;
     }
 
@@ -843,12 +843,12 @@ struct LeibnizDiff{
     static constexpr auto cached_right_offsets(){
         std::array<Int, total_cache_count()> res{};
         Int i=0;
-        auto f_dummy = [&] AUTODIFF_DEVICE (Int, auto order_wrt, auto dummy_order_wrt) LAMBDA_INLINE {
-            EXPAND(Int, Nvars, Ivar,
+        auto f_dummy = [&] AUTODIFF_DEVICE (Int, auto order_wrt, auto dummy_order_wrt) AD_LAMBDA_INLINE {
+            AD_EXPAND(Int, Nvars, Ivar,
                 res[i++] = MultiDiff<Norder, Nvars>::offset((order_wrt[Ivar]-dummy_order_wrt[Ivar])...);
             );
         };
-        iterate([] AUTODIFF_DEVICE (auto, auto) LAMBDA_INLINE {}, f_dummy);
+        iterate([] AUTODIFF_DEVICE (auto, auto) AD_LAMBDA_INLINE {}, f_dummy);
         return res;
     }
 
@@ -872,14 +872,14 @@ struct MulExpr : BaseOperand<MulExpr>{
 
     /// @brief Compound assignment: f *= g (AutoDiff *= AutoDiff).
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF& compound_assign(AUTODIFF& f, const AUTODIFF& other){
+    AD_INLINE static AUTODIFF& compound_assign(AUTODIFF& f, const AUTODIFF& other){
         f = f*other;
         return f;
     }
 
     /// @brief Compound assignment: f *= scalar (scales all derivatives).
     template<typename U, typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF& compound_assign(AUTODIFF& f, const U& other){
+    AD_INLINE static AUTODIFF& compound_assign(AUTODIFF& f, const U& other){
         for (Int i=0; i<AUTODIFF::Ntot; i++){
             f.data()[i] *= other;
         }
@@ -890,7 +890,7 @@ struct MulExpr : BaseOperand<MulExpr>{
     /// @brief Optimized AutoDiff * scalar.
     template<typename U, typename T, Int Norder, Int Nvars>
     requires (std::convertible_to<U, T>)
-    INLINE static AUTODIFF opt_result(const AUTODIFF& f, const U& g){
+    AD_INLINE static AUTODIFF opt_result(const AUTODIFF& f, const U& g){
         AUTODIFF res;
         for (Int i=0; i<AUTODIFF::Ntot; i++){
             res.data()[i] = f.data()[i]*g;
@@ -901,7 +901,7 @@ struct MulExpr : BaseOperand<MulExpr>{
     /// @brief Optimized scalar * AutoDiff.
     template<typename U, typename T, Int Norder, Int Nvars>
     requires (std::convertible_to<U, T>)
-    INLINE static AUTODIFF opt_result(const U& f, const AUTODIFF& g){
+    AD_INLINE static AUTODIFF opt_result(const U& f, const AUTODIFF& g){
         AUTODIFF res;
         for (Int i=0; i<AUTODIFF::Ntot; i++){
             res.data()[i] = f*g.data()[i];
@@ -918,7 +918,7 @@ struct MulExpr : BaseOperand<MulExpr>{
      * multinomial coefficients and index offsets.
      */
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF opt_result(const AUTODIFF& f, const AUTODIFF& g){
+    AD_INLINE static AUTODIFF opt_result(const AUTODIFF& f, const AUTODIFF& g){
         using Cache = LeibnizDiff<Norder, Nvars>;
 
         AUTODIFF res;
@@ -939,9 +939,9 @@ struct MulExpr : BaseOperand<MulExpr>{
 #elif defined (AUTODIFF_ITER_MUL)
     /// @brief Iterative multiplication without precomputed cache.
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF opt_result(const AUTODIFF& f, const AUTODIFF& g){
+    AD_INLINE static AUTODIFF opt_result(const AUTODIFF& f, const AUTODIFF& g){
         AUTODIFF res;
-        EXPAND(Int, Norder+1, Iord,
+        AD_EXPAND(Int, Norder+1, Iord,
             (apply_diffs<Iord>(res, f, g),...);
         );
         return res;
@@ -953,19 +953,19 @@ struct MulExpr : BaseOperand<MulExpr>{
      * @tparam ORDER The total derivative order to compute.
      */
     template<Int ORDER, typename T, Int Norder, Int Nvars>
-    INLINE static void apply_diffs(AUTODIFF& res, const AUTODIFF& f, const AUTODIFF& g){
+    AD_INLINE static void apply_diffs(AUTODIFF& res, const AUTODIFF& f, const AUTODIFF& g){
         static_assert(ORDER<=Norder, "ORDER too large");
         constexpr Int glf = MultiDiff<Norder, Nvars>::global_offset(ORDER);
         T* d = res.data()+glf;
         using IterType = utils::MultiSetIterator<ORDER, Nvars, true>;
 
-        [&] AUTODIFF_DEVICE <Int... Ivar>(INTS(Int, Ivar)) LAMBDA_INLINE {
+        [&] AUTODIFF_DEVICE <Int... Ivar>(AD_INTS(Int, Ivar)) AD_LAMBDA_INLINE {
             Int n_iter = 0;
-            auto func = [&] AUTODIFF_DEVICE (auto&, auto& ord_of_var) LAMBDA_INLINE {
+            auto func = [&] AUTODIFF_DEVICE (auto&, auto& ord_of_var) AD_LAMBDA_INLINE {
                 d[n_iter++] = diff_element(f, g, ord_of_var[Ivar]...);
             };
             IterType::apply_iter_on(func);
-        }(MAKE_INTS(Int, Nvars));
+        }(AD_MAKE_INTS(Int, Nvars));
     }
 
     /**
@@ -974,9 +974,9 @@ struct MulExpr : BaseOperand<MulExpr>{
      * @return The derivative value at the specified multi-index.
      */
     template<typename T, Int Norder, Int Nvars, std::integral... IntType>
-    INLINE static T diff_element(const AUTODIFF& f, const AUTODIFF& g, IntType... order){
+    AD_INLINE static T diff_element(const AUTODIFF& f, const AUTODIFF& g, IntType... order){
         T res = 0;
-        auto func = [&] AUTODIFF_DEVICE (auto... dummy_order) LAMBDA_INLINE {
+        auto func = [&] AUTODIFF_DEVICE (auto... dummy_order) AD_LAMBDA_INLINE {
             res += T((utils::comb(order, dummy_order)*...))*f.value_of_diff_counts(dummy_order...)*g.value_of_diff_counts((order-dummy_order)...);
         };
         DynamicNDIterator<Nvars>((order+1)...).iterate(func);
@@ -985,26 +985,26 @@ struct MulExpr : BaseOperand<MulExpr>{
 
     /// @brief Forward operation: f * g.
     template<typename T>
-    INLINE static T operation(const T& f, const T& g){
+    AD_INLINE static T operation(const T& f, const T& g){
         return f*g;
     }
 
     /// @brief Differentiation rule: d(fg)/dx = f·dg/dx + df/dx·g.
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const AUTODIFF& g, const AUTODIFF& df, const AUTODIFF& dg){
+    AD_INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const AUTODIFF& g, const AUTODIFF& df, const AUTODIFF& dg){
         return df*g + f*dg;
     }
 
     /// @brief Differentiation rule when g is constant.
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const T& g, const AUTODIFF& df, const T& dg){
+    AD_INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const T& g, const AUTODIFF& df, const T& dg){
         assert(dg==0);
         return df*g;
     }
 
     /// @brief Differentiation rule when f is constant.
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF diff_rule(const T& f, const AUTODIFF& g, const T& df, const AUTODIFF& dg){
+    AD_INLINE static AUTODIFF diff_rule(const T& f, const AUTODIFF& g, const T& df, const AUTODIFF& dg){
         assert(df==0);
         return f*dg;
     }
@@ -1020,20 +1020,20 @@ struct DivExpr : BaseOperand<DivExpr>{
 
     /// @brief Forward operation: f / g.
     template<typename T>
-    INLINE static T operation(const T& f, const T& g){
+    AD_INLINE static T operation(const T& f, const T& g){
         return f/g;
     }
 
     /// @brief Compound assignment: f /= g (AutoDiff /= AutoDiff).
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF& compound_assign(AUTODIFF& f, const AUTODIFF& other){
+    AD_INLINE static AUTODIFF& compound_assign(AUTODIFF& f, const AUTODIFF& other){
         f = f/other;
         return f;
     }
 
     /// @brief Compound assignment: f /= scalar.
     template<typename U, typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF& compound_assign(AUTODIFF& f, const U& other){
+    AD_INLINE static AUTODIFF& compound_assign(AUTODIFF& f, const U& other){
         for (Int i=0; i<AUTODIFF::Ntot; i++){
             f.data()[i] /= other;
         }
@@ -1044,7 +1044,7 @@ struct DivExpr : BaseOperand<DivExpr>{
     /// @brief Optimized AutoDiff / scalar.
     template<typename U, typename T, Int Norder, Int Nvars>
     requires (std::convertible_to<U, T>)
-    INLINE static AUTODIFF opt_result(const AUTODIFF& f, const U& g){
+    AD_INLINE static AUTODIFF opt_result(const AUTODIFF& f, const U& g){
         if constexpr (Norder == 0) {
             return AUTODIFF(f.value() / g);
         } else {
@@ -1059,20 +1059,20 @@ struct DivExpr : BaseOperand<DivExpr>{
 
     /// @brief Differentiation rule: d(f/g)/dx = (g·df/dx - f·dg/dx) / g².
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const AUTODIFF& g, const AUTODIFF& df, const AUTODIFF& dg){
+    AD_INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const AUTODIFF& g, const AUTODIFF& df, const AUTODIFF& dg){
         return (df*g - f*dg)/(g*g);
     }
 
     /// @brief Differentiation rule when g is constant.
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const T& g, const AUTODIFF& df, const T& dg){
+    AD_INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const T& g, const AUTODIFF& df, const T& dg){
         assert(dg==0);
         return df/g;
     }
 
     /// @brief Differentiation rule when f is constant.
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF diff_rule(const T& f, const AUTODIFF& g, const T& df, const AUTODIFF& dg){
+    AD_INLINE static AUTODIFF diff_rule(const T& f, const AUTODIFF& g, const T& df, const AUTODIFF& dg){
         assert(df==0);
         return -f*dg/(g*g);
     }
@@ -1088,13 +1088,13 @@ struct ExpExpr : BaseOperand<ExpExpr>{
 
     /// @brief Forward operation: exp(f).
     template<typename T>
-    INLINE static T operation(const T& f){
+    AD_INLINE static T operation(const T& f){
         return exp(f);
     }
 
     /// @brief Differentiation rule: d(exp(f))/dx = exp(f)·df/dx.
     template<typename T>
-    INLINE static T diff_rule(const T& f, const T& df){
+    AD_INLINE static T diff_rule(const T& f, const T& df){
         return exp(f)*df;
     }
 };
@@ -1106,13 +1106,13 @@ struct LogExpr : BaseOperand<LogExpr>{
 
     /// @brief Forward operation: log(f).
     template<typename T>
-    INLINE static T operation(const T& f){
+    AD_INLINE static T operation(const T& f){
         return log(f);
     }
 
     /// @brief Differentiation rule: d(log(f))/dx = df/dx / f.
     template<typename T>
-    INLINE static T diff_rule(const T& f, const T& df){
+    AD_INLINE static T diff_rule(const T& f, const T& df){
         return df/f;
     }
 };
@@ -1129,26 +1129,26 @@ struct PowExpr : BaseOperand<PowExpr>{
 
     /// @brief Forward operation: f^g.
     template<typename T>
-    INLINE static T operation(const T& f, const T& g){
+    AD_INLINE static T operation(const T& f, const T& g){
         return pow(f, g);
     }
 
     /// @brief General case: d(f^g)/dx = f^g · (dg/dx·log(f) + g·df/dx/f).
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const AUTODIFF& g, const AUTODIFF& df, const AUTODIFF& dg){
+    AD_INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const AUTODIFF& g, const AUTODIFF& df, const AUTODIFF& dg){
         return pow(f, g)*(dg*log(f) + g*df/f);
     }
 
     /// @brief Power rule: d(f^n)/dx = n·f^(n-1)·df/dx.
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const T& g, const AUTODIFF& df, const T& dg){
+    AD_INLINE static AUTODIFF diff_rule(const AUTODIFF& f, const T& g, const AUTODIFF& df, const T& dg){
         assert(dg==0);
         return g*pow(f, g-1)*df;
     }
 
     /// @brief Exponential derivative: d(a^g)/dx = a^g·log(a)·dg/dx.
     template<typename T, Int Norder, Int Nvars>
-    INLINE static AUTODIFF diff_rule(const T& f, const AUTODIFF& g, const T& df, const AUTODIFF& dg){
+    AD_INLINE static AUTODIFF diff_rule(const T& f, const AUTODIFF& g, const T& df, const AUTODIFF& dg){
         assert(df==0);
         return pow(f, g)*log(f)*dg;
     }
@@ -1160,13 +1160,13 @@ struct SqrtExpr : BaseOperand<SqrtExpr>{
 
     /// @brief Forward operation: sqrt(f).
     template<typename T>
-    INLINE static T operation(const T& f){
+    AD_INLINE static T operation(const T& f){
         return sqrt(f);
     }
 
     /// @brief Differentiation rule: d(sqrt(f))/dx = df/(2·sqrt(f)).
     template<typename T>
-    INLINE static T diff_rule(const T& f, const T& df){
+    AD_INLINE static T diff_rule(const T& f, const T& df){
         return df/(2*sqrt(f));
     }
 };
@@ -1176,13 +1176,13 @@ struct AbsExpr : BaseOperand<AbsExpr>{
 
     /// @brief Forward operation: abs(f).
     template<typename T>
-    INLINE static T operation(const T& f){
+    AD_INLINE static T operation(const T& f){
         return abs(f);
     }
 
     /// @brief Differentiation rule: d(abs(f))/dx = df/dx·sign(f) (undefined at f=0).
     template<typename T>
-    INLINE static T diff_rule(const T& f, const T& df){
+    AD_INLINE static T diff_rule(const T& f, const T& df){
         return df*(f>0 ? 1 : (f<0 ? -1 : 0));
     }
 };
@@ -1192,13 +1192,13 @@ struct SinExpr : BaseOperand<SinExpr>{
 
     /// @brief Forward operation: sin(f).
     template<typename T>
-    INLINE static T operation(const T& f){
+    AD_INLINE static T operation(const T& f){
         return sin(f);
     }
 
     /// @brief Differentiation rule: d(sin(f))/dx = cos(f)·df/dx.
     template<typename T>
-    INLINE static T diff_rule(const T& f, const T& df){
+    AD_INLINE static T diff_rule(const T& f, const T& df){
         return cos(f)*df;
     }
 };
@@ -1207,13 +1207,13 @@ struct CosExpr : BaseOperand<CosExpr>{
 
     /// @brief Forward operation: cos(f).
     template<typename T>
-    INLINE static T operation(const T& f){
+    AD_INLINE static T operation(const T& f){
         return cos(f);
     }
 
     /// @brief Differentiation rule: d(cos(f))/dx = -sin(f)·df/dx.
     template<typename T>
-    INLINE static T diff_rule(const T& f, const T& df){
+    AD_INLINE static T diff_rule(const T& f, const T& df){
         return -sin(f)*df;
     }
 };
@@ -1223,13 +1223,13 @@ struct TanExpr : BaseOperand<TanExpr>{
 
     /// @brief Forward operation: tan(f).
     template<typename T>
-    INLINE static T operation(const T& f){
+    AD_INLINE static T operation(const T& f){
         return tan(f);
     }
 
     /// @brief Differentiation rule: d(tan(f))/dx = sec²(f)·df/dx.
     template<typename T>
-    INLINE static T diff_rule(const T& f, const T& df){
+    AD_INLINE static T diff_rule(const T& f, const T& df){
         return (1+tan(f)*tan(f))*df;
     }
 };
@@ -1264,7 +1264,7 @@ template<typename T, Int Norder, Int Nvars>
 AUTODIFF::AutoDiff(T value) {_data[0] = value;}
 
 template<typename T, Int Norder, Int Nvars>
-INLINE const T& AUTODIFF::value() const{
+AD_INLINE const T& AUTODIFF::value() const{
     return _data[0];
 }
 
@@ -1273,13 +1273,13 @@ INLINE const T& AUTODIFF::value() const{
 // ----------------------------------------------------------------------------
 
 template<Int Norder, Int Nvars>
-INLINE constexpr Int MultiDiff<Norder, Nvars>::Ndiffs(Int order){
+AD_INLINE constexpr Int MultiDiff<Norder, Nvars>::Ndiffs(Int order){
     return utils::comb(Nvars+order-1, order);
 }
 
 template<Int Norder, Int Nvars>
 template<std::integral... IntType>
-INLINE constexpr Int MultiDiff<Norder, Nvars>::local_offset(IntType... order){
+AD_INLINE constexpr Int MultiDiff<Norder, Nvars>::local_offset(IntType... order){
     if constexpr (!(std::is_same_v<IntType, Int>&&...)){
         assert(((order>=0)&&...));
         return local_offset(order...);
@@ -1290,10 +1290,10 @@ INLINE constexpr Int MultiDiff<Norder, Nvars>::local_offset(IntType... order){
     assert(total_order <= Norder && "diff order must be <= Norder");
 
     // Compute colexicographic offset within the group
-    Int colex_offset = EXPAND(Int, Nx, variable,
-        return ([&] AUTODIFF_DEVICE () LAMBDA_INLINE {
+    Int colex_offset = AD_EXPAND(Int, Nx, variable,
+        return ([&] AUTODIFF_DEVICE () AD_LAMBDA_INLINE {
             constexpr Int v = variable;
-            Int truncated_total = EXPAND(Int, Nx, I,
+            Int truncated_total = AD_EXPAND(Int, Nx, I,
                 return ((static_cast<Int>(utils::pack_elem<I>(order...))*(I<v))+...);
             );
             Int res = 0;
@@ -1314,7 +1314,7 @@ INLINE constexpr Int MultiDiff<Norder, Nvars>::local_offset(IntType... order){
 }
 
 template<Int Norder, Int Nvars>
-INLINE constexpr Int MultiDiff<Norder, Nvars>::global_offset(Int order) {
+AD_INLINE constexpr Int MultiDiff<Norder, Nvars>::global_offset(Int order) {
     if (std::is_constant_evaluated()) {
         if (order > Norder) {
             throw "order > Norder in constexpr evaluation";
@@ -1327,13 +1327,13 @@ INLINE constexpr Int MultiDiff<Norder, Nvars>::global_offset(Int order) {
 
 template<Int Norder, Int Nvars>
 template<std::integral... IntType>
-INLINE constexpr Int MultiDiff<Norder, Nvars>::offset(IntType... order){
+AD_INLINE constexpr Int MultiDiff<Norder, Nvars>::offset(IntType... order){
     return global_offset((static_cast<Int>(order)+...)) + local_offset(order...);
 }
 
 template<Int Norder, Int Nvars>
-INLINE constexpr Int MultiDiff<Norder, Nvars>::offset(const std::array<Int, Nvars>& diff_count){
-    return EXPAND(Int, Nvars, I,
+AD_INLINE constexpr Int MultiDiff<Norder, Nvars>::offset(const std::array<Int, Nvars>& diff_count){
+    return AD_EXPAND(Int, Nvars, I,
         return global_offset((diff_count[I]+...)) + local_offset(diff_count[I]...);
     );
 }
@@ -1353,12 +1353,12 @@ AUTODIFF_MAYBE_INLINE constexpr AUTODIFF::ReducedArray<sizeof...(IntType)> AUTOD
 
     auto Nx = Base::diff_count(x...);
 
-    auto call_it = [&] AUTODIFF_DEVICE <Int... I>(std::integer_sequence<Int, I...>) LAMBDA_INLINE {
-        [&] AUTODIFF_DEVICE <Int... Ord>(INTS(Int, Ord)) LAMBDA_INLINE {
-            ([&] AUTODIFF_DEVICE <Int OrdI>() LAMBDA_INLINE {
+    auto call_it = [&] AUTODIFF_DEVICE <Int... I>(std::integer_sequence<Int, I...>) AD_LAMBDA_INLINE {
+        [&] AUTODIFF_DEVICE <Int... Ord>(AD_INTS(Int, Ord)) AD_LAMBDA_INLINE {
+            ([&] AUTODIFF_DEVICE <Int OrdI>() AD_LAMBDA_INLINE {
                 using IterType = utils::MultiSetIterator<OrdI+sizeof...(x), Nvars, true>;
 
-                auto f = [&] AUTODIFF_DEVICE (const IterType::SetType&, const IterType::CounterType& order_of_var) LAMBDA_INLINE {
+                auto f = [&] AUTODIFF_DEVICE (const IterType::SetType&, const IterType::CounterType& order_of_var) AD_LAMBDA_INLINE {
                     if ((((order_of_var[I] >= Nx[I])) &&...)){
                         res[n++] = Base::offset(order_of_var[I]...);
                     }
@@ -1366,15 +1366,15 @@ AUTODIFF_MAYBE_INLINE constexpr AUTODIFF::ReducedArray<sizeof...(IntType)> AUTOD
 
                 IterType::apply_iter_on(f);
             }.template operator()<Ord>(), ...);
-        }(MAKE_INTS(Int, NewOrder+1UL));
+        }(AD_MAKE_INTS(Int, NewOrder+1UL));
     };
 
-    call_it(MAKE_INTS(Int, Nvars));
+    call_it(AD_MAKE_INTS(Int, Nvars));
     return res;
 }
 
 template<typename T, Int Norder, Int Nvars>
-INLINE typename AUTODIFF::ReducedType AUTODIFF::reduced() const{
+AD_INLINE typename AUTODIFF::ReducedType AUTODIFF::reduced() const{
     if constexpr (Norder>0){
         typename ReducedType::DataType new_data;
         utils::copy_array(new_data.data(), _data.data(), ReducedType::Ntot);
@@ -1416,18 +1416,18 @@ AUTODIFF_MAYBE_INLINE AUTODIFF::Reduced<sizeof...(I)> constexpr AUTODIFF::cmpl_r
 }
 
 template<typename T, Int Norder, Int Nvars>
-INLINE const T* AUTODIFF::data() const{
+AD_INLINE const T* AUTODIFF::data() const{
     return _data.data();
 }
 
 template<typename T, Int Norder, Int Nvars>
-INLINE T* AUTODIFF::data(){
+AD_INLINE T* AUTODIFF::data(){
     return _data.data();
 }
 
 template<typename T, Int Norder, Int Nvars>
 template<VarLike... IntType>
-INLINE AUTODIFF AUTODIFF::diff(IntType... x) const{
+AD_INLINE AUTODIFF AUTODIFF::diff(IntType... x) const{
     auto f = this->reduced_diff(x...);
     AUTODIFF res;
     utils::copy_array(res.data(), f.data(), f.Ntot);
@@ -1436,7 +1436,7 @@ INLINE AUTODIFF AUTODIFF::diff(IntType... x) const{
 
 template<typename T, Int Norder, Int Nvars>
 template<VarLike... IntType>
-INLINE T AUTODIFF::diff_value(IntType... x) const{
+AD_INLINE T AUTODIFF::diff_value(IntType... x) const{
     auto Nx = Base::diff_count(x...);
     return _data[Base::offset(Nx)];
 }
@@ -1470,100 +1470,100 @@ COMPOUND_OPERATOR(operator/=, DivExpr)
 
 /// @brief Equality comparison: compares values only (derivatives ignored).
 template<typename T, Int Norder, Int Nvars>
-INLINE bool operator==(const AUTODIFF& a, const AUTODIFF& b){
+AD_INLINE bool operator==(const AUTODIFF& a, const AUTODIFF& b){
     return a.value() == b.value();
 }
 
 /// @brief Inequality comparison: compares values only (derivatives ignored).
 template<typename T, Int Norder, Int Nvars>
-INLINE bool operator!=(const AUTODIFF& a, const AUTODIFF& b){
+AD_INLINE bool operator!=(const AUTODIFF& a, const AUTODIFF& b){
     return a.value() != b.value();
 }
 
 /// @brief Less-than comparison: compares values only (derivatives ignored).
 template<typename T, Int Norder, Int Nvars>
-INLINE bool operator<(const AUTODIFF& a, const AUTODIFF& b){
+AD_INLINE bool operator<(const AUTODIFF& a, const AUTODIFF& b){
     return a.value() < b.value();
 }
 
 /// @brief Greater-than comparison: compares values only (derivatives ignored).
 template<typename T, Int Norder, Int Nvars>
-INLINE bool operator>(const AUTODIFF& a, const AUTODIFF& b){
+AD_INLINE bool operator>(const AUTODIFF& a, const AUTODIFF& b){
     return a.value() > b.value();
 }
 
 /// @brief Less-than-or-equal comparison: compares values only (derivatives ignored).
 template<typename T, Int Norder, Int Nvars>
-INLINE bool operator<=(const AUTODIFF& a, const AUTODIFF& b){
+AD_INLINE bool operator<=(const AUTODIFF& a, const AUTODIFF& b){
     return a.value() <= b.value();
 }
 
 /// @brief Greater-than-or-equal comparison: compares values only (derivatives ignored).
 template<typename T, Int Norder, Int Nvars>
-INLINE bool operator>=(const AUTODIFF& a, const AUTODIFF& b){
+AD_INLINE bool operator>=(const AUTODIFF& a, const AUTODIFF& b){
     return a.value() >= b.value();
 }
 
 
 // ----------------- templated comparison overloads ----------------------
 template<typename T, Int Norder, Int Nvars, typename U>
-INLINE bool operator==(const AUTODIFF& a, const U& b){
+AD_INLINE bool operator==(const AUTODIFF& a, const U& b){
     return a.value() == b;
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-INLINE bool operator!=(const AUTODIFF& a, const U& b){
+AD_INLINE bool operator!=(const AUTODIFF& a, const U& b){
     return a.value() != b;
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-INLINE bool operator<(const AUTODIFF& a, const U& b){
+AD_INLINE bool operator<(const AUTODIFF& a, const U& b){
     return a.value() < b;
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-INLINE bool operator>(const AUTODIFF& a, const U& b){
+AD_INLINE bool operator>(const AUTODIFF& a, const U& b){
     return a.value() > b;
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-INLINE bool operator<=(const AUTODIFF& a, const U& b){
+AD_INLINE bool operator<=(const AUTODIFF& a, const U& b){
     return a.value() <= b;
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-INLINE bool operator>=(const AUTODIFF& a, const U& b){
+AD_INLINE bool operator>=(const AUTODIFF& a, const U& b){
     return a.value() >= b;
 }
 
 // Allow comparisons with scalar on the left-hand side
 template<typename T, Int Norder, Int Nvars, typename U>
-INLINE bool operator==(const U& a, const AUTODIFF& b){
+AD_INLINE bool operator==(const U& a, const AUTODIFF& b){
     return a == b.value();
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-INLINE bool operator!=(const U& a, const AUTODIFF& b){
+AD_INLINE bool operator!=(const U& a, const AUTODIFF& b){
     return a != b.value();
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-INLINE bool operator<(const U& a, const AUTODIFF& b){
+AD_INLINE bool operator<(const U& a, const AUTODIFF& b){
     return a < b.value();
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-INLINE bool operator>(const U& a, const AUTODIFF& b){
+AD_INLINE bool operator>(const U& a, const AUTODIFF& b){
     return a > b.value();
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-INLINE bool operator<=(const U& a, const AUTODIFF& b){
+AD_INLINE bool operator<=(const U& a, const AUTODIFF& b){
     return a <= b.value();
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-INLINE bool operator>=(const U& a, const AUTODIFF& b){
+AD_INLINE bool operator>=(const U& a, const AUTODIFF& b){
     return a >= b.value();
 }
 
@@ -1649,14 +1649,29 @@ public:
 };
 
 template<typename T, autodiff::Int Norder, autodiff::Int Nvars>
-INLINE bool isfinite(const autodiff::AUTODIFF& x){
+AD_INLINE bool isfinite(const autodiff::AUTODIFF& x){
     return isfinite(x.value());
 }
 
 template<typename T, autodiff::Int Norder, autodiff::Int Nvars>
-INLINE autodiff::AUTODIFF abs(const autodiff::AUTODIFF& x){
+AD_INLINE autodiff::AUTODIFF abs(const autodiff::AUTODIFF& x){
     return autodiff::abs(x);
 }
 }
+
+
+#undef AD_THIS
+#undef AD_UNIQUE_NAME
+#undef AD_CONCAT
+#undef AD_CONCAT_IMPL
+#undef AD_INTS
+#undef AD_MAKE_INTS
+#undef AD_EXPAND
+#undef AD_FOR_LOOP_IMPL
+#undef AD_FOR_LOOP
+#undef AD_INLINE
+#undef AD_LAMBDA_INLINE
+
+
 
 #endif // AUTODIFF_HPP

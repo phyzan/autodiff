@@ -256,7 +256,7 @@ AutoDiff provides several preprocessor macros to optimize performance for differ
 
 | Macro | Description | Trade-off |
 |-------|-------------|-----------|
-| `AUTODIFF_FAST` | Enables aggressive inlining with `INLINE` attribute | Faster execution, longer compilation time |
+| `AUTODIFF_FAST` | Enables aggressive inlining with `AD_INLINE` attribute | Faster execution, longer compilation time |
 | `AUTODIFF_SCALAR_OPTS` | Enables optimized scalar-AutoDiff operations | Faster scalar ops, more code |
 | `AUTODIFF_ITER_MUL_OPT` | Uses precomputed Leibniz coefficients for multiplication | Fastest multiplication, compile-time cost |
 | `AUTODIFF_ITER_MUL` | Uses iterative (non-recursive) multiplication | Balanced speed/compile-time |
@@ -281,7 +281,7 @@ g++ -std=c++20 -O3 -DAUTODIFF_FAST -DAUTODIFF_ITER_MUL main.cpp -o main
 
 #### `AUTODIFF_FAST`
 
-When defined, `AUTODIFF_MAYBE_INLINE` becomes `INLINE` (force inline). Otherwise, it's just `inline`.
+When defined, `AUTODIFF_MAYBE_INLINE` becomes `AD_INLINE` (force inline). Otherwise, it's just `inline`.
 
 ```cpp
 // Without AUTODIFF_FAST: AUTODIFF_MAYBE_INLINE = inline

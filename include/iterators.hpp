@@ -75,32 +75,32 @@
 // Utility macros
 // =============================================================================
 
-#define THIS static_cast<std::conditional_t<std::is_void_v<Derived>, \
+#define AD_THIS static_cast<std::conditional_t<std::is_void_v<Derived>, \
     std::remove_reference_t<decltype(*this)>, \
     utils::copy_const_t<std::remove_reference_t<decltype(*this)>, Derived>>*>(this)
-#define UNIQUE_NAME(base) CONCAT(base, __COUNTER__)
-#define CONCAT(a,b) CONCAT_IMPL(a,b)
-#define CONCAT_IMPL(a,b) a##b
+#define AD_UNIQUE_NAME(base) AD_CONCAT(base, __COUNTER__)
+#define AD_CONCAT(a,b) AD_CONCAT_IMPL(a,b)
+#define AD_CONCAT_IMPL(a,b) a##b
 
-#define INTS(IntType, I) std::integer_sequence<IntType, I...>
+#define AD_INTS(IntType, I) std::integer_sequence<IntType, I...>
 
-#define MAKE_INTS(IntType, N) std::make_integer_sequence<IntType, N>{}
+#define AD_MAKE_INTS(IntType, N) std::make_integer_sequence<IntType, N>{}
 
-#define EXPAND(IntType, N, I, ...) [&] AUTODIFF_DEVICE <IntType... I>(INTS(IntType, I)) \
+#define AD_EXPAND(IntType, N, I, ...) [&] AUTODIFF_DEVICE <IntType... I>(AD_INTS(IntType, I)) \
     AUTODIFF_ALWAYS_INLINE { \
     __VA_ARGS__ \
-}(MAKE_INTS(IntType, N))
+}(AD_MAKE_INTS(IntType, N))
 
-#define FOR_LOOP_IMPL(IntType, I, N, IDUMMY, ...) \
-[&] AUTODIFF_DEVICE <IntType... IDUMMY>(INTS(IntType, IDUMMY)) AUTODIFF_ALWAYS_INLINE { \
+#define AD_FOR_LOOP_IMPL(IntType, I, N, IDUMMY, ...) \
+[&] AUTODIFF_DEVICE <IntType... IDUMMY>(AD_INTS(IntType, IDUMMY)) AUTODIFF_ALWAYS_INLINE { \
     ([&] AUTODIFF_DEVICE <IntType I>() AUTODIFF_ALWAYS_INLINE { __VA_ARGS__ }.template operator()<IDUMMY>(), ...); \
-}(MAKE_INTS(IntType, N))
+}(AD_MAKE_INTS(IntType, N))
 
-#define FOR_LOOP(IntType, I, N, ...) \
-    FOR_LOOP_IMPL(IntType, I, N, CONCAT(IDUMMY,__COUNTER__), __VA_ARGS__)
+#define AD_FOR_LOOP(IntType, I, N, ...) \
+    AD_FOR_LOOP_IMPL(IntType, I, N, AD_CONCAT(IDUMMY,__COUNTER__), __VA_ARGS__)
 
-#define INLINE AUTODIFF_INLINE_HOST_DEVICE
-#define LAMBDA_INLINE AUTODIFF_ALWAYS_INLINE
+#define AD_INLINE AUTODIFF_INLINE_HOST_DEVICE
+#define AD_LAMBDA_INLINE AUTODIFF_ALWAYS_INLINE
 
 
 namespace autodiff {
@@ -112,7 +112,7 @@ template<typename From, typename To>
 using copy_const_t = std::conditional_t<std::is_const_v<From>, const To, To>;
 
 template<std::size_t I, typename FirstType, typename... ArgType>
-INLINE constexpr decltype(auto) pack_elem(FirstType&& x0, ArgType&&... x) {
+AD_INLINE constexpr decltype(auto) pack_elem(FirstType&& x0, ArgType&&... x) {
     if constexpr (I == 0) {
         return std::forward<FirstType>(x0);
     } else {
@@ -145,7 +145,7 @@ AUTODIFF_HOST_DEVICE constexpr size_t comb(size_t n, size_t k) {
 }
 
 template<typename T>
-INLINE void constexpr copy_array(T* dest, const T* src, size_t size){
+AD_INLINE void constexpr copy_array(T* dest, const T* src, size_t size){
     // avoid std::copy or memcpy for gpu code compatibility
     for (size_t i = 0; i < size; ++i) {
         dest[i] = src[i];
@@ -159,21 +159,21 @@ class IndexIterator{
 public:
 
     template<std::integral... IntType>
-    INLINE bool constexpr iterating(IntType&... idx) const{
+    AD_INLINE bool constexpr iterating(IntType&... idx) const{
         static_assert(sizeof...(idx)==ND, "Invalid number of indices");
         return iterating_impl(idx...);
     }
 
     template<typename Callable>
-    INLINE void constexpr iterate(Callable&& f) const{
+    AD_INLINE void constexpr iterate(Callable&& f) const{
         //static override
-        return THIS->iterate(std::forward<Callable>(f));
+        return AD_THIS->iterate(std::forward<Callable>(f));
     }
 
     template<std::integral... IntType>
-    INLINE bool iterating_impl(IntType&... idx) const{
+    AD_INLINE bool iterating_impl(IntType&... idx) const{
         //static override
-        return THIS->iterating_impl(idx...);
+        return AD_THIS->iterating_impl(idx...);
     }
 
     inline size_t ndims() const{
@@ -195,7 +195,7 @@ public:
     using IdxHolder = std::array<size_t, ND>;
 
     template<size_t I, typename Callable>
-    INLINE static void constexpr iterate_impl(IdxHolder& idx, Callable&& f, const IdxHolder& limit){
+    AD_INLINE static void constexpr iterate_impl(IdxHolder& idx, Callable&& f, const IdxHolder& limit){
         if constexpr (I < ND) {
             idx[I] = 0;
             do {
@@ -204,7 +204,7 @@ public:
             }while (idx[I] < limit[I]);
         }
         else{
-            EXPAND(size_t, ND, J, 
+            AD_EXPAND(size_t, ND, J, 
                 f(idx[J]...);
             );
         }
@@ -213,7 +213,7 @@ public:
 protected:
 
     template<size_t I, size_t... Is, std::integral... IntType>
-    INLINE static constexpr bool increment(std::index_sequence<Is...>, const IdxHolder& limit, IntType&... idx){
+    AD_INLINE static constexpr bool increment(std::index_sequence<Is...>, const IdxHolder& limit, IntType&... idx){
         if constexpr (I==0) {
             return ((Is==I && (++idx<limit[Is] ? true : (idx=0, false)))||...);
         }
@@ -239,12 +239,12 @@ class StaticNDIterator : public BaseNdIterator<StaticNDIterator<Dim...>, sizeof.
 public:
 
     template<std::integral... IntType>
-    INLINE bool iterating_impl(IntType&... idx) const{
+    AD_INLINE bool iterating_impl(IntType&... idx) const{
         return Base::template increment<ND-1>(std::make_index_sequence<ND>{}, SHAPE, idx...);
     }
 
     template<typename Callable>
-    INLINE void constexpr iterate(Callable&& f) const{
+    AD_INLINE void constexpr iterate(Callable&& f) const{
         typename Base::IdxHolder idx{};
         return Base::template iterate_impl<0>(idx, std::forward<Callable>(f), SHAPE);
     }
@@ -265,12 +265,12 @@ public:
     }
 
     template<std::integral... IntType>
-    INLINE bool iterating_impl(IntType&... idx) const{
+    AD_INLINE bool iterating_impl(IntType&... idx) const{
         return Base::template increment<ND-1>(std::make_index_sequence<ND>{}, _shape, idx...);
     }
 
     template<typename Callable>
-    INLINE void constexpr iterate(Callable&& f) const{
+    AD_INLINE void constexpr iterate(Callable&& f) const{
         typename Base::IdxHolder idx{};
         return Base::template iterate_impl<0>(idx, std::forward<Callable>(f), _shape);
     }
@@ -289,14 +289,14 @@ public:
     using CounterType = std::array<size_t, Rank>;
 
     template<typename Callable>
-    INLINE static constexpr void apply_iter_on(Callable&& f){
+    AD_INLINE static constexpr void apply_iter_on(Callable&& f){
         SetType set{};
         CounterType counter{};
         doit<0>(set, counter,std::forward<Callable>(f));
     }
 
     template<size_t slot, typename Callable>
-    INLINE static void constexpr doit(SetType& set, CounterType& counter, Callable&& f){
+    AD_INLINE static void constexpr doit(SetType& set, CounterType& counter, Callable&& f){
         if constexpr (slot < Slots) {
             size_t& var = set[slot];
             if constexpr (slot == 0) {
