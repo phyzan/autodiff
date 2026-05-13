@@ -21,7 +21,7 @@
 #include "iterators.hpp"
 
 #ifndef AUTODIFF_FAST
-#define AUTODIFF_MAYBE_INLINE inline
+#define AUTODIFF_MAYBE_INLINE AUTODIFF_HOST_DEVICE inline
 #else
 #define AUTODIFF_MAYBE_INLINE INLINE
 #endif
@@ -162,7 +162,7 @@ template<Int Norder, Int Nvars>
 struct MultiDiff{
 
     /// Total number of unique partial derivatives (including value).
-    static constexpr Int Ntot = comb(Nvars+Norder, Norder);
+    static constexpr Int Ntot = utils::comb(Nvars+Norder, Norder);
 
     /**
      * @brief Returns the number of unique derivatives of a given order.
@@ -351,10 +351,10 @@ public:
     AUTODIFF_MAYBE_INLINE Reduced<sizeof...(I)> constexpr cmpl_reduced_diff(Variable<I>... x)const;
 
     /// @brief Returns a const pointer to the internal storage.
-    inline const T* data() const;
+    INLINE const T* data() const;
 
     /// @brief Returns a mutable pointer to the internal storage.
-    inline T* data();
+    INLINE T* data();
 
     /**
      * @brief Extracts a derivative, returning the same AutoDiff type.
@@ -367,7 +367,7 @@ public:
      * @return AutoDiff of same type with derivative as value.
      */
     template<VarLike... IntType>
-    inline AUTODIFF diff(IntType... x) const;
+    INLINE AUTODIFF diff(IntType... x) const;
 
     /**
      * @brief Returns the numeric value of a specific partial derivative.
@@ -376,7 +376,7 @@ public:
      * @return The derivative value as a scalar.
      */
     template<VarLike... IntType>
-    inline T diff_value(IntType... x) const;
+    INLINE T diff_value(IntType... x) const;
 
     /// @brief Unary plus (returns copy).
     AUTODIFF operator+()const{
@@ -504,7 +504,7 @@ struct BaseOperand{
         }
         else{
             // Compute derivative w.r.t. each variable
-            auto q = [&] <Int I> (auto&&... f) LAMBDA_INLINE {
+            auto q = [&] AUTODIFF_DEVICE <Int I> (auto&&... f) LAMBDA_INLINE {
                 return Derived::diff_rule(
                     _reduced_value<T, AUTODIFF>(f)...,
                     _reduced_diff<T, AUTODIFF, I>(f)...
@@ -519,12 +519,12 @@ struct BaseOperand{
 
             // Assemble derivatives into result array
             EXPAND(Int, Norder, Ord,
-                auto g = [&]<Int ord>() LAMBDA_INLINE {
+                auto g = [&] AUTODIFF_DEVICE <Int ord>() LAMBDA_INLINE {
                     EXPAND(Int, Nvars, Ivar,
-                        auto f = [&]<Int var>() LAMBDA_INLINE {
+                        auto f = [&] AUTODIFF_DEVICE <Int var>() LAMBDA_INLINE {
                             constexpr Int Noff_tot = MultiDiff<AUTODIFF::ReducedOrder, Nvars>::offset(ord*(var==Ivar)...);
                             constexpr Int Nelements = MultiDiff<AUTODIFF::ReducedOrder, Nvars>::Ndiffs(ord)-MultiDiff<AUTODIFF::ReducedOrder, Nvars>::local_offset(ord*(var==Ivar)...);
-                            copy_array(res.data()+n, h[var].data()+Noff_tot, Nelements);
+                            utils::copy_array(res.data()+n, h[var].data()+Noff_tot, Nelements);
                             n+=Nelements;
                         };
                         (f.template operator()<Ivar>(), ...);
@@ -765,7 +765,7 @@ struct SubtrExpr : BaseOperand<SubtrExpr>{
 template<Int Norder, Int Nvars>
 struct LeibnizDiff{
 
-    static constexpr Int NDIFFS = comb(Nvars+Norder, Norder);
+    static constexpr Int NDIFFS = utils::comb(Nvars+Norder, Norder);
 
     /**
      * @brief Iterates over all Leibniz rule terms.
@@ -775,13 +775,13 @@ struct LeibnizDiff{
     template<typename Callable1, typename Callable2>
     static constexpr void iterate(Callable1&& f_main, Callable2&& f_dummy){
         FOR_LOOP(Int, Iord, Norder+1,
-            using IterType = MultiSetIterator<Iord, Nvars, true>;
+            using IterType = utils::MultiSetIterator<Iord, Nvars, true>;
             EXPAND(Int, Nvars, Ivar,
-                auto main_func = [&](auto&, auto& ord_of_var) LAMBDA_INLINE {
-                    auto dummy_func = [&](auto... dummy_order) LAMBDA_INLINE {
+                auto main_func = [&] AUTODIFF_DEVICE (auto&, auto& ord_of_var) LAMBDA_INLINE {
+                    auto dummy_func = [&] AUTODIFF_DEVICE (auto... dummy_order) LAMBDA_INLINE {
                         f_dummy(Iord, ord_of_var, std::array<Int, Nvars>({dummy_order...}));
                     };
-                    DynamicNDIterator<Nvars>((ord_of_var[Ivar]+1)...).iterate(dummy_func);
+                    utils::DynamicNDIterator<Nvars>((ord_of_var[Ivar]+1)...).iterate(dummy_func);
                     f_main(Iord, ord_of_var);
                 };
                 IterType::apply_iter_on(main_func);
@@ -792,10 +792,10 @@ struct LeibnizDiff{
     /// @brief Total number of terms across all Leibniz sums.
     static constexpr Int total_cache_count(){
         Int res = 0;
-        auto f_dummy = [&](Int order, auto order_wrt, auto dummy_order_wrt) LAMBDA_INLINE {
+        auto f_dummy = [&] AUTODIFF_DEVICE (Int order, auto order_wrt, auto dummy_order_wrt) LAMBDA_INLINE {
             res++;
         };
-        iterate([](auto, auto) LAMBDA_INLINE {}, f_dummy);
+        iterate([] AUTODIFF_DEVICE (auto, auto) LAMBDA_INLINE {}, f_dummy);
         return res;
     }
 
@@ -803,10 +803,10 @@ struct LeibnizDiff{
     static constexpr std::array<Int, NDIFFS> Nsum_per_offset(){
         std::array<Int, NDIFFS> res{};
         Int i=0;
-        auto f_main = [&](Int, auto) LAMBDA_INLINE {
+        auto f_main = [&] AUTODIFF_DEVICE (Int, auto) LAMBDA_INLINE {
             i++;
         };
-        auto f_dummy = [&](Int, auto, auto) LAMBDA_INLINE {
+        auto f_dummy = [&] AUTODIFF_DEVICE (Int, auto, auto) LAMBDA_INLINE {
             res[i]++;
         };
         iterate(f_main, f_dummy);
@@ -817,12 +817,12 @@ struct LeibnizDiff{
     static constexpr auto cached_coefs(){
         std::array<Int, total_cache_count()> res{};
         Int i=0;
-        auto f_dummy = [&](Int, auto order_wrt, auto dummy_order_wrt) LAMBDA_INLINE {
+        auto f_dummy = [&] AUTODIFF_DEVICE (Int, auto order_wrt, auto dummy_order_wrt) LAMBDA_INLINE {
             EXPAND(Int, Nvars, Ivar,
-                res[i++] = (comb(order_wrt[Ivar], dummy_order_wrt[Ivar])*...);
+                res[i++] = (utils::comb(order_wrt[Ivar], dummy_order_wrt[Ivar])*...);
             );
         };
-        iterate([](auto, auto) LAMBDA_INLINE {}, f_dummy);
+        iterate([] AUTODIFF_DEVICE (auto, auto) LAMBDA_INLINE {}, f_dummy);
         return res;
     }
 
@@ -830,12 +830,12 @@ struct LeibnizDiff{
     static constexpr auto cached_left_offsets(){
         std::array<Int, total_cache_count()> res{};
         Int i=0;
-        auto f_dummy = [&](Int, auto, auto dummy_order_wrt) LAMBDA_INLINE {
+        auto f_dummy = [&] AUTODIFF_DEVICE (Int, auto, auto dummy_order_wrt) LAMBDA_INLINE {
             EXPAND(Int, Nvars, Ivar,
                 res[i++] = MultiDiff<Norder, Nvars>::offset(dummy_order_wrt[Ivar]...);
             );
         };
-        iterate([](auto, auto) LAMBDA_INLINE {}, f_dummy);
+        iterate([] AUTODIFF_DEVICE (auto, auto) LAMBDA_INLINE {}, f_dummy);
         return res;
     }
 
@@ -843,12 +843,12 @@ struct LeibnizDiff{
     static constexpr auto cached_right_offsets(){
         std::array<Int, total_cache_count()> res{};
         Int i=0;
-        auto f_dummy = [&](Int, auto order_wrt, auto dummy_order_wrt) LAMBDA_INLINE {
+        auto f_dummy = [&] AUTODIFF_DEVICE (Int, auto order_wrt, auto dummy_order_wrt) LAMBDA_INLINE {
             EXPAND(Int, Nvars, Ivar,
                 res[i++] = MultiDiff<Norder, Nvars>::offset((order_wrt[Ivar]-dummy_order_wrt[Ivar])...);
             );
         };
-        iterate([](auto, auto) LAMBDA_INLINE {}, f_dummy);
+        iterate([] AUTODIFF_DEVICE (auto, auto) LAMBDA_INLINE {}, f_dummy);
         return res;
     }
 
@@ -957,11 +957,11 @@ struct MulExpr : BaseOperand<MulExpr>{
         static_assert(ORDER<=Norder, "ORDER too large");
         constexpr Int glf = MultiDiff<Norder, Nvars>::global_offset(ORDER);
         T* d = res.data()+glf;
-        using IterType = MultiSetIterator<ORDER, Nvars, true>;
+        using IterType = utils::MultiSetIterator<ORDER, Nvars, true>;
 
-        [&]<Int... Ivar>(INTS(Int, Ivar)) LAMBDA_INLINE {
+        [&] AUTODIFF_DEVICE <Int... Ivar>(INTS(Int, Ivar)) LAMBDA_INLINE {
             Int n_iter = 0;
-            auto func = [&](auto&, auto& ord_of_var) LAMBDA_INLINE {
+            auto func = [&] AUTODIFF_DEVICE (auto&, auto& ord_of_var) LAMBDA_INLINE {
                 d[n_iter++] = diff_element(f, g, ord_of_var[Ivar]...);
             };
             IterType::apply_iter_on(func);
@@ -976,8 +976,8 @@ struct MulExpr : BaseOperand<MulExpr>{
     template<typename T, Int Norder, Int Nvars, std::integral... IntType>
     INLINE static T diff_element(const AUTODIFF& f, const AUTODIFF& g, IntType... order){
         T res = 0;
-        auto func = [&](auto... dummy_order) LAMBDA_INLINE {
-            res += T((comb(order, dummy_order)*...))*f.value_of_diff_counts(dummy_order...)*g.value_of_diff_counts((order-dummy_order)...);
+        auto func = [&] AUTODIFF_DEVICE (auto... dummy_order) LAMBDA_INLINE {
+            res += T((utils::comb(order, dummy_order)*...))*f.value_of_diff_counts(dummy_order...)*g.value_of_diff_counts((order-dummy_order)...);
         };
         DynamicNDIterator<Nvars>((order+1)...).iterate(func);
         return res;
@@ -1274,7 +1274,7 @@ INLINE const T& AUTODIFF::value() const{
 
 template<Int Norder, Int Nvars>
 INLINE constexpr Int MultiDiff<Norder, Nvars>::Ndiffs(Int order){
-    return comb(Nvars+order-1, order);
+    return utils::comb(Nvars+order-1, order);
 }
 
 template<Int Norder, Int Nvars>
@@ -1291,16 +1291,16 @@ INLINE constexpr Int MultiDiff<Norder, Nvars>::local_offset(IntType... order){
 
     // Compute colexicographic offset within the group
     Int colex_offset = EXPAND(Int, Nx, variable,
-        return ([&]() LAMBDA_INLINE {
+        return ([&] AUTODIFF_DEVICE () LAMBDA_INLINE {
             constexpr Int v = variable;
             Int truncated_total = EXPAND(Int, Nx, I,
-                return ((static_cast<Int>(pack_elem<I>(order...))*(I<v))+...);
+                return ((static_cast<Int>(utils::pack_elem<I>(order...))*(I<v))+...);
             );
             Int res = 0;
-            for (Int j = 0; j < static_cast<Int>(pack_elem<v>(order...)); j++){
+            for (Int j = 0; j < static_cast<Int>(utils::pack_elem<v>(order...)); j++){
                 Int remaining = total_order - truncated_total - j;
                 if (remaining > 0 && Nvars - v - 1 > 0) {
-                    res += comb(Nvars - v - 1 + remaining - 1, remaining);
+                    res += utils::comb(Nvars - v - 1 + remaining - 1, remaining);
                 } else if (remaining == 0) {
                     res += 1;
                 }
@@ -1309,7 +1309,7 @@ INLINE constexpr Int MultiDiff<Norder, Nvars>::local_offset(IntType... order){
         }()+...);
     );
 
-    Int total_for_order = multiset_coef(Nvars, total_order);
+    Int total_for_order = utils::multiset_coef(Nvars, total_order);
     return total_for_order - colex_offset - 1;
 }
 
@@ -1322,7 +1322,7 @@ INLINE constexpr Int MultiDiff<Norder, Nvars>::global_offset(Int order) {
     } else {
         assert(order <= Norder && "Requested order is > Norder");
     }
-    return order == 0 ? 0 : comb(Nvars + order - 1, order - 1);
+    return order == 0 ? 0 : utils::comb(Nvars + order - 1, order - 1);
 }
 
 template<Int Norder, Int Nvars>
@@ -1353,12 +1353,12 @@ AUTODIFF_MAYBE_INLINE constexpr AUTODIFF::ReducedArray<sizeof...(IntType)> AUTOD
 
     auto Nx = Base::diff_count(x...);
 
-    auto call_it = [&]<Int... I>(std::integer_sequence<Int, I...>) LAMBDA_INLINE {
-        [&]<Int... Ord>(INTS(Int, Ord)) LAMBDA_INLINE {
-            ([&]<Int OrdI>() LAMBDA_INLINE {
-                using IterType = MultiSetIterator<OrdI+sizeof...(x), Nvars, true>;
+    auto call_it = [&] AUTODIFF_DEVICE <Int... I>(std::integer_sequence<Int, I...>) LAMBDA_INLINE {
+        [&] AUTODIFF_DEVICE <Int... Ord>(INTS(Int, Ord)) LAMBDA_INLINE {
+            ([&] AUTODIFF_DEVICE <Int OrdI>() LAMBDA_INLINE {
+                using IterType = utils::MultiSetIterator<OrdI+sizeof...(x), Nvars, true>;
 
-                auto f = [&](const IterType::SetType&, const IterType::CounterType& order_of_var) LAMBDA_INLINE {
+                auto f = [&] AUTODIFF_DEVICE (const IterType::SetType&, const IterType::CounterType& order_of_var) LAMBDA_INLINE {
                     if ((((order_of_var[I] >= Nx[I])) &&...)){
                         res[n++] = Base::offset(order_of_var[I]...);
                     }
@@ -1377,7 +1377,7 @@ template<typename T, Int Norder, Int Nvars>
 INLINE typename AUTODIFF::ReducedType AUTODIFF::reduced() const{
     if constexpr (Norder>0){
         typename ReducedType::DataType new_data;
-        copy_array(new_data.data(), _data.data(), ReducedType::Ntot);
+        utils::copy_array(new_data.data(), _data.data(), ReducedType::Ntot);
         return ReducedType(new_data);
     }
     else{
@@ -1390,7 +1390,7 @@ template<VarLike... IntType>
 requires (sizeof...(IntType)<=Norder)
 AUTODIFF_MAYBE_INLINE AUTODIFF::Reduced<sizeof...(IntType)> constexpr AUTODIFF::reduced_diff(IntType... I)const{
     using ResType = typename AUTODIFF::Reduced<sizeof...(I)>;
-    using IterType = MultiSetIterator<Nvars, Norder, true>;
+    using IterType = utils::MultiSetIterator<Nvars, Norder, true>;
     auto offsets = offsets_for_reduced_diff(I...);
     typename ResType::DataType data{};
 
@@ -1405,7 +1405,7 @@ template<Int... I>
 requires (sizeof...(I)<=Norder)
 AUTODIFF_MAYBE_INLINE AUTODIFF::Reduced<sizeof...(I)> constexpr AUTODIFF::cmpl_reduced_diff(Variable<I>...)const{
     using ResType = typename AUTODIFF::Reduced<sizeof...(I)>;
-    using IterType = MultiSetIterator<Nvars, Norder, true>;
+    using IterType = utils::MultiSetIterator<Nvars, Norder, true>;
     auto constexpr offsets = offsets_for_reduced_diff(I...);
     typename ResType::DataType data{};
 
@@ -1416,27 +1416,27 @@ AUTODIFF_MAYBE_INLINE AUTODIFF::Reduced<sizeof...(I)> constexpr AUTODIFF::cmpl_r
 }
 
 template<typename T, Int Norder, Int Nvars>
-inline const T* AUTODIFF::data() const{
+INLINE const T* AUTODIFF::data() const{
     return _data.data();
 }
 
 template<typename T, Int Norder, Int Nvars>
-inline T* AUTODIFF::data(){
+INLINE T* AUTODIFF::data(){
     return _data.data();
 }
 
 template<typename T, Int Norder, Int Nvars>
 template<VarLike... IntType>
-inline AUTODIFF AUTODIFF::diff(IntType... x) const{
+INLINE AUTODIFF AUTODIFF::diff(IntType... x) const{
     auto f = this->reduced_diff(x...);
     AUTODIFF res;
-    copy_array(res.data(), f.data(), f.Ntot);
+    utils::copy_array(res.data(), f.data(), f.Ntot);
     return res;
 }
 
 template<typename T, Int Norder, Int Nvars>
 template<VarLike... IntType>
-inline T AUTODIFF::diff_value(IntType... x) const{
+INLINE T AUTODIFF::diff_value(IntType... x) const{
     auto Nx = Base::diff_count(x...);
     return _data[Base::offset(Nx)];
 }
@@ -1470,100 +1470,100 @@ COMPOUND_OPERATOR(operator/=, DivExpr)
 
 /// @brief Equality comparison: compares values only (derivatives ignored).
 template<typename T, Int Norder, Int Nvars>
-inline bool operator==(const AUTODIFF& a, const AUTODIFF& b){
+INLINE bool operator==(const AUTODIFF& a, const AUTODIFF& b){
     return a.value() == b.value();
 }
 
 /// @brief Inequality comparison: compares values only (derivatives ignored).
 template<typename T, Int Norder, Int Nvars>
-inline bool operator!=(const AUTODIFF& a, const AUTODIFF& b){
+INLINE bool operator!=(const AUTODIFF& a, const AUTODIFF& b){
     return a.value() != b.value();
 }
 
 /// @brief Less-than comparison: compares values only (derivatives ignored).
 template<typename T, Int Norder, Int Nvars>
-inline bool operator<(const AUTODIFF& a, const AUTODIFF& b){
+INLINE bool operator<(const AUTODIFF& a, const AUTODIFF& b){
     return a.value() < b.value();
 }
 
 /// @brief Greater-than comparison: compares values only (derivatives ignored).
 template<typename T, Int Norder, Int Nvars>
-inline bool operator>(const AUTODIFF& a, const AUTODIFF& b){
+INLINE bool operator>(const AUTODIFF& a, const AUTODIFF& b){
     return a.value() > b.value();
 }
 
 /// @brief Less-than-or-equal comparison: compares values only (derivatives ignored).
 template<typename T, Int Norder, Int Nvars>
-inline bool operator<=(const AUTODIFF& a, const AUTODIFF& b){
+INLINE bool operator<=(const AUTODIFF& a, const AUTODIFF& b){
     return a.value() <= b.value();
 }
 
 /// @brief Greater-than-or-equal comparison: compares values only (derivatives ignored).
 template<typename T, Int Norder, Int Nvars>
-inline bool operator>=(const AUTODIFF& a, const AUTODIFF& b){
+INLINE bool operator>=(const AUTODIFF& a, const AUTODIFF& b){
     return a.value() >= b.value();
 }
 
 
 // ----------------- templated comparison overloads ----------------------
 template<typename T, Int Norder, Int Nvars, typename U>
-inline bool operator==(const AUTODIFF& a, const U& b){
+INLINE bool operator==(const AUTODIFF& a, const U& b){
     return a.value() == b;
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-inline bool operator!=(const AUTODIFF& a, const U& b){
+INLINE bool operator!=(const AUTODIFF& a, const U& b){
     return a.value() != b;
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-inline bool operator<(const AUTODIFF& a, const U& b){
+INLINE bool operator<(const AUTODIFF& a, const U& b){
     return a.value() < b;
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-inline bool operator>(const AUTODIFF& a, const U& b){
+INLINE bool operator>(const AUTODIFF& a, const U& b){
     return a.value() > b;
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-inline bool operator<=(const AUTODIFF& a, const U& b){
+INLINE bool operator<=(const AUTODIFF& a, const U& b){
     return a.value() <= b;
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-inline bool operator>=(const AUTODIFF& a, const U& b){
+INLINE bool operator>=(const AUTODIFF& a, const U& b){
     return a.value() >= b;
 }
 
 // Allow comparisons with scalar on the left-hand side
 template<typename T, Int Norder, Int Nvars, typename U>
-inline bool operator==(const U& a, const AUTODIFF& b){
+INLINE bool operator==(const U& a, const AUTODIFF& b){
     return a == b.value();
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-inline bool operator!=(const U& a, const AUTODIFF& b){
+INLINE bool operator!=(const U& a, const AUTODIFF& b){
     return a != b.value();
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-inline bool operator<(const U& a, const AUTODIFF& b){
+INLINE bool operator<(const U& a, const AUTODIFF& b){
     return a < b.value();
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-inline bool operator>(const U& a, const AUTODIFF& b){
+INLINE bool operator>(const U& a, const AUTODIFF& b){
     return a > b.value();
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-inline bool operator<=(const U& a, const AUTODIFF& b){
+INLINE bool operator<=(const U& a, const AUTODIFF& b){
     return a <= b.value();
 }
 
 template<typename T, Int Norder, Int Nvars, typename U>
-inline bool operator>=(const U& a, const AUTODIFF& b){
+INLINE bool operator>=(const U& a, const AUTODIFF& b){
     return a >= b.value();
 }
 
@@ -1615,46 +1615,46 @@ template<typename T, autodiff::Int Norder, autodiff::Int Nvars>
 class numeric_limits<autodiff::AUTODIFF> : public numeric_limits<T>{
 public:
 
-    static constexpr autodiff::AUTODIFF min() noexcept {
+    AUTODIFF_HOST_DEVICE static constexpr autodiff::AUTODIFF min() noexcept {
         return autodiff::AUTODIFF(numeric_limits<T>::min());
     }
 
-    static constexpr autodiff::AUTODIFF max() noexcept {
+    AUTODIFF_HOST_DEVICE static constexpr autodiff::AUTODIFF max() noexcept {
         return autodiff::AUTODIFF(numeric_limits<T>::max());
     }
 
-    static constexpr autodiff::AUTODIFF lowest() noexcept {
+    AUTODIFF_HOST_DEVICE static constexpr autodiff::AUTODIFF lowest() noexcept {
         return autodiff::AUTODIFF(numeric_limits<T>::lowest());
     }
 
-    static constexpr autodiff::AUTODIFF epsilon() noexcept {
+    AUTODIFF_HOST_DEVICE static constexpr autodiff::AUTODIFF epsilon() noexcept {
         return autodiff::AUTODIFF(numeric_limits<T>::epsilon());
     }
 
-    static constexpr autodiff::AUTODIFF infinity() noexcept {
+    AUTODIFF_HOST_DEVICE static constexpr autodiff::AUTODIFF infinity() noexcept {
         return autodiff::AUTODIFF(numeric_limits<T>::infinity());
     }
 
-    static constexpr autodiff::AUTODIFF quiet_NaN() noexcept {
+    AUTODIFF_HOST_DEVICE static constexpr autodiff::AUTODIFF quiet_NaN() noexcept {
         return autodiff::AUTODIFF(numeric_limits<T>::quiet_NaN());
     }
 
-    static constexpr autodiff::AUTODIFF signaling_NaN() noexcept {
+    AUTODIFF_HOST_DEVICE static constexpr autodiff::AUTODIFF signaling_NaN() noexcept {
         return autodiff::AUTODIFF(numeric_limits<T>::signaling_NaN());
     }
-    
-    static constexpr autodiff::AUTODIFF denorm_min() noexcept {
+
+    AUTODIFF_HOST_DEVICE static constexpr autodiff::AUTODIFF denorm_min() noexcept {
         return autodiff::AUTODIFF(numeric_limits<T>::denorm_min());
     }
 };
 
 template<typename T, autodiff::Int Norder, autodiff::Int Nvars>
-inline bool isfinite(const autodiff::AUTODIFF& x){
-    return std::isfinite(x.value());
+INLINE bool isfinite(const autodiff::AUTODIFF& x){
+    return isfinite(x.value());
 }
 
 template<typename T, autodiff::Int Norder, autodiff::Int Nvars>
-inline autodiff::AUTODIFF abs(const autodiff::AUTODIFF& x){
+INLINE autodiff::AUTODIFF abs(const autodiff::AUTODIFF& x){
     return autodiff::abs(x);
 }
 }

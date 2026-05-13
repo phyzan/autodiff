@@ -4,12 +4,80 @@
 #include <cstdlib>
 #include <array>
 #include <cassert>
-#include <cstring>
 #include <numeric>
+
+// =============================================================================
+// Backend detection and platform macros
+// =============================================================================
+
+// Detect backend
+#if defined(__CUDACC__)
+#define AUTODIFF_BACKEND_CUDA 1
+#elif defined(__HIPCC__)
+#define AUTODIFF_BACKEND_HIP 1
+#elif defined(SYCL_LANGUAGE_VERSION) || defined(__INTEL_LLVM_COMPILER)
+#define AUTODIFF_BACKEND_SYCL 1
+#else
+#define AUTODIFF_BACKEND_CPU 1
+#endif
+
+// =============================================================================
+// Device/Host qualifiers
+// =============================================================================
+
+#if defined(AUTODIFF_BACKEND_CUDA) || defined(AUTODIFF_BACKEND_HIP)
+
+#define AUTODIFF_DEVICE __device__
+#define AUTODIFF_HOST __host__
+#define AUTODIFF_HOST_DEVICE __host__ __device__
+#define AUTODIFF_FORCEINLINE __forceinline__
+#define AUTODIFF_INLINE_DEVICE __forceinline__ __device__
+#define AUTODIFF_INLINE_HOST_DEVICE __forceinline__ __host__ __device__
+
+#elif defined(AUTODIFF_BACKEND_SYCL)
+
+#define AUTODIFF_DEVICE
+#define AUTODIFF_HOST
+#define AUTODIFF_HOST_DEVICE
+#define AUTODIFF_FORCEINLINE inline
+#define AUTODIFF_INLINE_DEVICE inline
+#define AUTODIFF_INLINE_HOST_DEVICE inline
+
+#else // CPU
+
+#define AUTODIFF_DEVICE
+#define AUTODIFF_HOST
+#define AUTODIFF_HOST_DEVICE
+
+#if defined(_MSC_VER)
+#define AUTODIFF_FORCEINLINE __forceinline
+#elif defined(__GNUC__) || defined(__clang__)
+#define AUTODIFF_FORCEINLINE __attribute__((always_inline)) inline
+#else
+#define AUTODIFF_FORCEINLINE inline
+#endif
+
+#define AUTODIFF_INLINE_DEVICE AUTODIFF_FORCEINLINE
+#define AUTODIFF_INLINE_HOST_DEVICE AUTODIFF_FORCEINLINE
+
+#endif
+
+// For lambda attributes (flatten only on GCC/Clang, not CUDA/HIP)
+#if defined(AUTODIFF_BACKEND_CUDA) || defined(AUTODIFF_BACKEND_HIP)
+#define AUTODIFF_ALWAYS_INLINE __forceinline__
+#elif defined(__GNUC__) || defined(__clang__)
+#define AUTODIFF_ALWAYS_INLINE __attribute__((always_inline, flatten))
+#else
+#define AUTODIFF_ALWAYS_INLINE
+#endif
+
+// =============================================================================
+// Utility macros
+// =============================================================================
 
 #define THIS static_cast<std::conditional_t<std::is_void_v<Derived>, \
     std::remove_reference_t<decltype(*this)>, \
-    copy_const_t<std::remove_reference_t<decltype(*this)>, Derived>>*>(this)
+    utils::copy_const_t<std::remove_reference_t<decltype(*this)>, Derived>>*>(this)
 #define UNIQUE_NAME(base) CONCAT(base, __COUNTER__)
 #define CONCAT(a,b) CONCAT_IMPL(a,b)
 #define CONCAT_IMPL(a,b) a##b
@@ -18,24 +86,27 @@
 
 #define MAKE_INTS(IntType, N) std::make_integer_sequence<IntType, N>{}
 
-#define EXPAND(IntType, N, I, ...) [&]<IntType... I>(INTS(IntType, I)) \
-    __attribute__((always_inline, flatten)) { \
+#define EXPAND(IntType, N, I, ...) [&] AUTODIFF_DEVICE <IntType... I>(INTS(IntType, I)) \
+    AUTODIFF_ALWAYS_INLINE { \
     __VA_ARGS__ \
 }(MAKE_INTS(IntType, N))
 
 #define FOR_LOOP_IMPL(IntType, I, N, IDUMMY, ...) \
-[&]<IntType... IDUMMY>(INTS(IntType, IDUMMY)) __attribute__((always_inline, flatten)) { \
-    ([&]<IntType I>() { __VA_ARGS__ }.template operator()<IDUMMY>(), ...); \
+[&] AUTODIFF_DEVICE <IntType... IDUMMY>(INTS(IntType, IDUMMY)) AUTODIFF_ALWAYS_INLINE { \
+    ([&] AUTODIFF_DEVICE <IntType I>() AUTODIFF_ALWAYS_INLINE { __VA_ARGS__ }.template operator()<IDUMMY>(), ...); \
 }(MAKE_INTS(IntType, N))
 
 #define FOR_LOOP(IntType, I, N, ...) \
     FOR_LOOP_IMPL(IntType, I, N, CONCAT(IDUMMY,__COUNTER__), __VA_ARGS__)
 
-#define INLINE __attribute__((always_inline)) inline
-#define LAMBDA_INLINE __attribute__((always_inline, flatten))
+#define INLINE AUTODIFF_INLINE_HOST_DEVICE
+#define LAMBDA_INLINE AUTODIFF_ALWAYS_INLINE
 
 
 namespace autodiff {
+
+
+namespace utils {
 
 template<typename From, typename To>
 using copy_const_t = std::conditional_t<std::is_const_v<From>, const To, To>;
@@ -50,7 +121,7 @@ INLINE constexpr decltype(auto) pack_elem(FirstType&& x0, ArgType&&... x) {
     }
 }
 
-constexpr size_t comb(size_t n, size_t k) {
+AUTODIFF_HOST_DEVICE constexpr size_t comb(size_t n, size_t k) {
     assert(n >= k);
 
     k = std::min(k, n - k);
@@ -75,12 +146,9 @@ constexpr size_t comb(size_t n, size_t k) {
 
 template<typename T>
 INLINE void constexpr copy_array(T* dest, const T* src, size_t size){
-    if (size==0) {return;}
-    if constexpr (std::is_trivially_copyable_v<T>){
-        std::memcpy(dest, src, size*sizeof(T));
-    }
-    else{
-        std::copy(src, src+size, dest);
+    // avoid std::copy or memcpy for gpu code compatibility
+    for (size_t i = 0; i < size; ++i) {
+        dest[i] = src[i];
     }
 }
 
@@ -261,13 +329,15 @@ public:
 
 };
 
-inline constexpr size_t multiset_coef(size_t n, size_t k){
+AUTODIFF_INLINE_HOST_DEVICE constexpr size_t multiset_coef(size_t n, size_t k){
     //number of weak compositions
     //let A be a vector of n positive integers. 
     //This function returns the number of vectors
     // (combinations of (A_1, ... ,A_n)) that sum exactly to k
     return comb(n+k-1, k);
 }
+
+} // namespace utils
 
 } // namespace autodiff
 
